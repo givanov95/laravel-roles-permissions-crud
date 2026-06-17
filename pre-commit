@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Quality-gate pre-commit — provided by givanov95/laravel-git-hooks.
+# Thin shim that delegates to the shared package hook so a single,
+# versioned source of truth runs in every project.
+exec "$(git rev-parse --show-toplevel)/vendor/givanov95/laravel-git-hooks/hooks/pre-commit" "$@"

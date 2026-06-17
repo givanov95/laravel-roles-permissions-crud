@@ -1,0 +1,45 @@
+{
+    "name": "@givanov95/vue-roles-permissions-crud",
+    "version": "1.0.0",
+    "description": "Vue 3 + Inertia roles & permissions CRUD components for givanov95/laravel-roles-permissions-crud.",
+    "license": "MIT",
+    "author": "Georgi Ivanov <joroz95@gmail.com>",
+    "type": "module",
+    "main": "resources/js/index.ts",
+    "module": "resources/js/index.ts",
+    "types": "resources/js/index.ts",
+    "exports": {
+        ".": {
+            "types": "./resources/js/index.ts",
+            "import": "./resources/js/index.ts"
+        },
+        "./*": "./resources/js/*"
+    },
+    "files": [
+        "resources/js",
+        "README.md",
+        "LICENSE"
+    ],
+    "peerDependencies": {
+        "@givanov95/vue-forms": "*",
+        "@inertiajs/vue3": "^1.0.0 || ^2.0.0 || ^3.0.0",
+        "vue": "^3.2.0"
+    },
+    "keywords": [
+        "vue",
+        "vue3",
+        "inertia",
+        "laravel",
+        "roles",
+        "permissions",
+        "rbac"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/givanov95/laravel-roles-permissions-crud.git"
+    },
+    "bugs": {
+        "url": "https://github.com/givanov95/laravel-roles-permissions-crud/issues"
+    },
+    "homepage": "https://github.com/givanov95/laravel-roles-permissions-crud#readme"
+}

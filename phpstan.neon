@@ -1,0 +1,14 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+    excludePaths:
+        - tests
+    ignoreErrors:
+        # Traits are only fully analyzed via the consuming class.
+        # The package's own src has no concrete consumer; trait correctness is
+        # verified by the trait tests in tests/.
+        - identifier: trait.unused
