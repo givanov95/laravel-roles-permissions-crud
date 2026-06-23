@@ -59,10 +59,10 @@ return [
     | Inertia page prefix
     |--------------------------------------------------------------------------
     |
-    | The controllers render "{page_prefix}/Roles/Index", etc. Your app must
+    | The controllers render "{page_prefix}/roles/Index", etc. Your app must
     | expose matching thin page shells (which wrap the package components in
     | your own layout) at resources/js/pages/{page_prefix}/...
     |
     */
-    'page_prefix' => 'Admin',
+    'page_prefix' => 'admin',
 ];

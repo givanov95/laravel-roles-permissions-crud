@@ -31,7 +31,7 @@ class RoleController extends Controller
             ->groupBy($roleKey)
             ->pluck('aggregate', $roleKey);
 
-        return Inertia::render($this->page('Roles/Index'), [
+        return Inertia::render($this->page('roles/Index'), [
             'roles' => Role::query()
                 ->with('permissions:id,name')
                 ->orderBy('name')
@@ -48,7 +48,7 @@ class RoleController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render($this->page('Roles/Create'), [
+        return Inertia::render($this->page('roles/Create'), [
             'permissions' => $this->permissionOptions(),
         ]);
     }
@@ -69,7 +69,7 @@ class RoleController extends Controller
 
     public function edit(Role $role): Response
     {
-        return Inertia::render($this->page('Roles/Edit'), [
+        return Inertia::render($this->page('roles/Edit'), [
             'role' => [
                 'id'           => $role->id,
                 'name'         => $role->name,
@@ -138,7 +138,7 @@ class RoleController extends Controller
 
     private function page(string $path): string
     {
-        return trim(config('roles-permissions-crud.page_prefix', 'Admin'), '/').'/'.$path;
+        return trim(config('roles-permissions-crud.page_prefix', 'admin'), '/').'/'.$path;
     }
 
     private function routeName(string $name): string

@@ -16,7 +16,7 @@ class PermissionController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render($this->page('Permissions/Index'), [
+        return Inertia::render($this->page('permissions/Index'), [
             'permissions' => Permission::query()
                 ->withCount('roles')
                 ->orderBy('name')
@@ -31,7 +31,7 @@ class PermissionController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render($this->page('Permissions/Create'));
+        return Inertia::render($this->page('permissions/Create'));
     }
 
     public function store(StorePermissionRequest $request): RedirectResponse
@@ -48,7 +48,7 @@ class PermissionController extends Controller
 
     public function edit(Permission $permission): Response
     {
-        return Inertia::render($this->page('Permissions/Edit'), [
+        return Inertia::render($this->page('permissions/Edit'), [
             'permission' => [
                 'id'   => $permission->id,
                 'name' => $permission->name,
@@ -76,7 +76,7 @@ class PermissionController extends Controller
 
     private function page(string $path): string
     {
-        return trim(config('roles-permissions-crud.page_prefix', 'Admin'), '/').'/'.$path;
+        return trim(config('roles-permissions-crud.page_prefix', 'admin'), '/').'/'.$path;
     }
 
     private function routeName(string $name): string
