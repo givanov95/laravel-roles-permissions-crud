@@ -1,6 +1,6 @@
 {
     "name": "@givanov95/vue-roles-permissions-crud",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Vue 3 + Inertia roles & permissions CRUD components for givanov95/laravel-roles-permissions-crud.",
     "license": "MIT",
     "author": "Georgi Ivanov <joroz95@gmail.com>",
