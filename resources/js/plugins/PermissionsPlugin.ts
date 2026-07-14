@@ -8,7 +8,9 @@ import { usePage } from "@inertiajs/vue3";
 export const PermissionsPlugin = {
     install: (app: App) => {
         app.config.globalProperties.$can = (permission: string) => {
-            const permissions = (usePage().props as { auth: { user: { permissions: string[] } } }).auth.user.permissions;
+            // Guests have auth.user = null — treat them as having no permissions.
+            const props = usePage().props as unknown as { auth?: { user?: { permissions?: string[] } | null } };
+            const permissions = props.auth?.user?.permissions ?? [];
 
             return permissions.includes(permission);
         };
