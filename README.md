@@ -60,9 +60,11 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-forms']
    php artisan vendor:publish --tag=roles-permissions-crud-config
    ```
 
-   Keys: `guard`, `authorize_role`, `protected_roles`, `prefix`, `route_name_prefix`,
-   `middleware`, `page_prefix`. Defaults assume a super-admin admin area
-   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`).
+   Keys: `guard`, `authorize_permissions`, `protected_roles`, `prefix`,
+   `route_name_prefix`, `middleware`, `page_prefix`. Defaults gate the admin
+   area by the `manage-roles` / `manage-permissions` permissions
+   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`);
+   seed those permissions and grant them to your admin role.
 
 2. Register the routes in `routes/web.php`:
 
@@ -71,7 +73,8 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-forms']
    ```
 
    This creates `admin.roles.*` and `admin.permissions.*` resource routes (minus
-   `show`) under the configured prefix and middleware.
+   `show`) under the configured prefix and middleware, with per-resource
+   `permission:` middleware from `authorize_permissions`.
 
 ## Frontend wiring
 

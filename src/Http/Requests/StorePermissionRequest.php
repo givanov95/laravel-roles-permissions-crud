@@ -10,9 +10,9 @@ class StorePermissionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $role = config('roles-permissions-crud.authorize_role');
+        $permission = config('roles-permissions-crud.authorize_permissions.permissions');
 
-        return $role === null || ($this->user()?->hasRole($role) ?? false);
+        return $permission === null || ($this->user()?->can($permission) ?? false);
     }
 
     /**

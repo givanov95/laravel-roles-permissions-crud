@@ -39,13 +39,18 @@ class RolesPermissionsCrudServiceProvider extends ServiceProvider
     {
         Route::macro('rolesPermissionsCrud', function () {
             $config = config('roles-permissions-crud');
+            $permissions = $config['authorize_permissions'] ?? [];
 
             Route::middleware($config['middleware'])
                 ->prefix($config['prefix'])
                 ->name($config['route_name_prefix'])
-                ->group(function () {
-                    Route::resource('roles', RoleController::class)->except(['show']);
-                    Route::resource('permissions', PermissionController::class)->except(['show']);
+                ->group(function () use ($permissions) {
+                    Route::resource('roles', RoleController::class)
+                        ->except(['show'])
+                        ->middleware(isset($permissions['roles']) ? ['permission:'.$permissions['roles']] : []);
+                    Route::resource('permissions', PermissionController::class)
+                        ->except(['show'])
+                        ->middleware(isset($permissions['permissions']) ? ['permission:'.$permissions['permissions']] : []);
                 });
         });
     }

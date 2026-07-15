@@ -16,15 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Authorization role
+    | Authorization permissions
     |--------------------------------------------------------------------------
     |
-    | The role a user must have for the package FormRequests to authorize the
-    | create/update actions. Set to null to skip the role check entirely (rely
-    | only on route middleware).
+    | The permission a user must have for each resource. Checked by the
+    | package FormRequests, and applied as `permission:` route middleware by
+    | the Route::rolesPermissionsCrud() macro. Set a value to null to skip
+    | the check for that resource (rely only on your own route middleware).
     |
     */
-    'authorize_role' => 'super-admin',
+    'authorize_permissions' => [
+        'roles'       => 'manage-roles',
+        'permissions' => 'manage-permissions',
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -47,12 +51,14 @@ return [
     | - route_name_prefix: name prefix; controllers redirect to
     |                      "{route_name_prefix}roles.index" etc. Keep the
     |                      trailing dot.
-    | - middleware:       middleware stack applied to the route group.
+    | - middleware:       middleware stack applied to the route group. The
+    |                     per-resource `permission:` middleware is added on
+    |                     top, from `authorize_permissions` above.
     |
     */
     'prefix' => 'admin',
     'route_name_prefix' => 'admin.',
-    'middleware' => ['web', 'auth', 'verified', 'role:super-admin'],
+    'middleware' => ['web', 'auth', 'verified'],
 
     /*
     |--------------------------------------------------------------------------
