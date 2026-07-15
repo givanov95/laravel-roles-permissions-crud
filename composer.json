@@ -21,7 +21,7 @@
         "spatie/laravel-permission": "^6.0|^7.0"
     },
     "require-dev": {
-        "givanov95/laravel-git-hooks": "^0.1.0",
+        "givanov95/laravel-git-hooks": "^1.1",
         "larastan/larastan": "^3.0",
         "orchestra/testbench": "^9.0|^10.0",
         "phpunit/phpunit": "^11.0|^12.0"
