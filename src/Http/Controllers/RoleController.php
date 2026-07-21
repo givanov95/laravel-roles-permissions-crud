@@ -138,7 +138,9 @@ class RoleController extends Controller
 
     private function page(string $path): string
     {
-        return trim(config('roles-permissions-crud.page_prefix', 'admin'), '/').'/'.$path;
+        $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
+
+        return $prefix === '' ? $path : $prefix.'/'.$path;
     }
 
     private function routeName(string $name): string
