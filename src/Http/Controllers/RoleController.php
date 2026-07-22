@@ -60,7 +60,10 @@ class RoleController extends Controller
             'guard_name' => config('roles-permissions-crud.guard', 'web'),
         ]);
 
-        $role->syncPermissions($request->validated('permissions', []));
+        // Cast to int: form values arrive as numeric strings and Spatie treats
+        // a string permission as a *name* (not an id), so "2" would be looked up
+        // by name and throw PermissionDoesNotExist. Ids must be integers.
+        $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
 
         return redirect()
             ->route($this->routeName('roles.index'))
@@ -88,7 +91,10 @@ class RoleController extends Controller
             $role->update(['name' => $request->validated('name')]);
         }
 
-        $role->syncPermissions($request->validated('permissions', []));
+        // Cast to int: form values arrive as numeric strings and Spatie treats
+        // a string permission as a *name* (not an id), so "2" would be looked up
+        // by name and throw PermissionDoesNotExist. Ids must be integers.
+        $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
 
         return redirect()
             ->route($this->routeName('roles.index'))
