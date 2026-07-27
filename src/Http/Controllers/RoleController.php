@@ -65,9 +65,9 @@ class RoleController extends Controller
         // by name and throw PermissionDoesNotExist. Ids must be integers.
         $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
 
-        return redirect()
-            ->route($this->routeName('roles.index'))
-            ->with('success', __('The role has been created.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been created.')]);
+
+        return redirect()->route($this->routeName('roles.index'));
     }
 
     public function edit(Role $role): Response
@@ -96,24 +96,24 @@ class RoleController extends Controller
         // by name and throw PermissionDoesNotExist. Ids must be integers.
         $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
 
-        return redirect()
-            ->route($this->routeName('roles.index'))
-            ->with('success', __('The role has been updated.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been updated.')]);
+
+        return redirect()->route($this->routeName('roles.index'));
     }
 
     public function destroy(Role $role): RedirectResponse
     {
         if ($this->isProtected($role)) {
-            return redirect()
-                ->route($this->routeName('roles.index'))
-                ->with('error', __('This role is protected and cannot be deleted.'));
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is protected and cannot be deleted.')]);
+
+            return redirect()->route($this->routeName('roles.index'));
         }
 
         $role->delete();
 
-        return redirect()
-            ->route($this->routeName('roles.index'))
-            ->with('success', __('The role has been deleted.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been deleted.')]);
+
+        return redirect()->route($this->routeName('roles.index'));
     }
 
     private function isProtected(Role $role): bool

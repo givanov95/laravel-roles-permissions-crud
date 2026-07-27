@@ -41,9 +41,9 @@ class PermissionController extends Controller
             'guard_name' => config('roles-permissions-crud.guard', 'web'),
         ]);
 
-        return redirect()
-            ->route($this->routeName('permissions.index'))
-            ->with('success', __('The permission has been created.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been created.')]);
+
+        return redirect()->route($this->routeName('permissions.index'));
     }
 
     public function edit(Permission $permission): Response
@@ -60,18 +60,18 @@ class PermissionController extends Controller
     {
         $permission->update(['name' => $request->validated('name')]);
 
-        return redirect()
-            ->route($this->routeName('permissions.index'))
-            ->with('success', __('The permission has been updated.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been updated.')]);
+
+        return redirect()->route($this->routeName('permissions.index'));
     }
 
     public function destroy(Permission $permission): RedirectResponse
     {
         $permission->delete();
 
-        return redirect()
-            ->route($this->routeName('permissions.index'))
-            ->with('success', __('The permission has been deleted.'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been deleted.')]);
+
+        return redirect()->route($this->routeName('permissions.index'));
     }
 
     private function page(string $path): string
