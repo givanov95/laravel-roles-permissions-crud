@@ -62,7 +62,7 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-forms']
 
    Keys: `guard`, `authorize_permissions`, `protected_roles`, `prefix`,
    `route_name_prefix`, `middleware`, `page_prefix`. Defaults gate the admin
-   area by the `manage-roles` / `manage-permissions` permissions
+   area by the `view-roles` / `view-permissions` permissions
    (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`);
    seed those permissions and grant them to your admin role.
 

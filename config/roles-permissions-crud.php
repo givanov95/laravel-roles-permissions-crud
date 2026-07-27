@@ -26,8 +26,8 @@ return [
     |
     */
     'authorize_permissions' => [
-        'roles'       => 'manage-roles',
-        'permissions' => 'manage-permissions',
+        'roles'       => 'view-roles',
+        'permissions' => 'view-permissions',
     ],
 
     /*
