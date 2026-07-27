@@ -1,5 +1,20 @@
 # Changelog
 
+## v4.0.0
+
+### Breaking
+- Success/error toasts are now emitted via `Inertia::flash('toast', …)` (native
+  Inertia page-level flash) instead of `redirect()->with('success'/'error', …)`.
+  That is what the Vue starter kit's `flashToast` composable actually reads
+  (`router.on('flash')` → page-level flash, one-time and cache-safe), so
+  role/permission CRUD toasts now show — the old `->with(...)` only populated
+  `props.flash`, which the listener never read.
+- The package now requires `inertiajs/inertia-laravel: ^3.0` (dropped ^1/^2),
+  since `Inertia::flash()` is a v3 feature.
+
+  **Upgrade:** be on inertia-laravel ^3, and make sure a flash-toast listener
+  reads the page-level `flash` (the kit's `flashToast` does).
+
 ## v3.0.0
 
 ### Breaking
