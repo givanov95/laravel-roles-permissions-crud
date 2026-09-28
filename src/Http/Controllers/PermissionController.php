@@ -62,7 +62,7 @@ class PermissionController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been updated.')]);
 
-        return redirect()->route($this->routeName('permissions.index'));
+        return redirect()->route($this->routeName('permissions.edit'), $permission);
     }
 
     public function destroy(Permission $permission): RedirectResponse
