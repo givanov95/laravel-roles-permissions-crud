@@ -32,7 +32,7 @@ const form = useForm<{ _method?: string; name: string; permissions: number[] }>(
 
 const submit = () => {
     if (props.role) {
-        form.post(r("roles.update", props.role.id) as string);
+        form.post(r("roles.update", props.role.id) as string, { preserveState: "errors" });
     } else {
         form.post(r("roles.store") as string);
     }

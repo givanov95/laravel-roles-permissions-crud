@@ -22,7 +22,7 @@ const form = useForm<{ _method?: string; name: string }>({
 
 const submit = () => {
     if (props.permission) {
-        form.post(r("permissions.update", props.permission.id) as string);
+        form.post(r("permissions.update", props.permission.id) as string, { preserveState: "errors" });
     } else {
         form.post(r("permissions.store") as string);
     }

@@ -98,7 +98,7 @@ class RoleController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been updated.')]);
 
-        return redirect()->route($this->routeName('roles.index'));
+        return redirect()->route($this->routeName('roles.edit'), $role);
     }
 
     public function destroy(Role $role): RedirectResponse

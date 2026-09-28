@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.0.1
+
+### Fixed
+- `RoleController::update()` and `PermissionController::update()` now redirect
+  back to their own `edit` route instead of `index`, so the admin stays on the
+  record they just saved. The matching `RoleForm`/`PermissionForm` submit calls
+  now pass `preserveState: 'errors'`, so a successful save remounts the page
+  from fresh server props (validation errors still preserve the form state).
+  No action needed from consumers.
+
+### Added
+- A minimal Testbench feature-test suite (`composer test`) covering the
+  store/update/destroy redirects on both controllers.
+
 ## v4.0.0
 
 ### Breaking
