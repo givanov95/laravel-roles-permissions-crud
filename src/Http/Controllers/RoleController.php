@@ -128,7 +128,7 @@ class RoleController extends Controller
     }
 
     /**
-     * @return array<int, array{name: string, value: int}>
+     * @return array<int, array{value: int, label: string}>
      */
     private function permissionOptions(): array
     {
@@ -136,8 +136,8 @@ class RoleController extends Controller
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Permission $permission) => [
-                'name'  => $permission->name,
                 'value' => $permission->id,
+                'label' => $permission->name,
             ])
             ->all();
     }

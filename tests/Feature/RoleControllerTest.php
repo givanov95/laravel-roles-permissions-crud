@@ -19,6 +19,19 @@ class RoleControllerTest extends TestCase
         $this->assertDatabaseHas('roles', ['name' => 'editor']);
     }
 
+    public function test_create_shares_permissions_as_value_label_options(): void
+    {
+        $b = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $a = Permission::create(['name' => 'edit-posts', 'guard_name' => 'web']);
+
+        $this->getJson(route('admin.roles.create'), ['X-Inertia' => 'true'])
+            ->assertOk()
+            ->assertJsonPath('props.permissions', [
+                ['value' => $a->id, 'label' => 'edit-posts'],
+                ['value' => $b->id, 'label' => 'view-posts'],
+            ]);
+    }
+
     public function test_update_redirects_back_to_edit(): void
     {
         $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
