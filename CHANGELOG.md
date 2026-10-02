@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.1.0
 
 ### Changed
 - The npm package's `RoleForm` now picks permissions with a plain checkbox list
