@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- The npm package's `RoleForm` now picks permissions with a plain checkbox list
+  instead of the `@givanov95/vue-forms` multi `Select`. The prop contract
+  (`permissions: { value, label }[]`) is unchanged.
+
+### Removed
+- `@givanov95/vue-forms` peer dependency. `@givanov95/vue-forms` (retired) no longer
+  needs to be installed or listed in `ssr.noExternal`.
+
 ## v5.0.0
 
 ### Breaking
