@@ -1,5 +1,20 @@
 # Changelog
 
+## v5.0.0
+
+### Breaking
+- `RoleController` now shares the `permissions` prop on `Admin/Roles/Create` and
+  `Admin/Roles/Edit` as `{ value, label }` options (was `{ name, value }`), the
+  same contract as `MultiSelect` / `RadioOptions` / `Combobox` in the starter
+  kit and the `HasOptions` enum trait.
+- The npm package's `RoleForm` expects the new shape too
+  (`permissions: { value: number; label: string }[]`).
+
+  **Upgrade:** bump both `givanov95/laravel-roles-permissions-crud` and
+  `@givanov95/vue-roles-permissions-crud` to ^5.0. Custom Create/Edit pages
+  that map `permissions` client-side (`{ value, label: permission.name }`) can
+  pass the prop straight to `MultiSelect` and drop the mapping.
+
 ## v4.0.1
 
 ### Fixed

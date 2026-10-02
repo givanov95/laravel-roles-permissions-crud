@@ -19,8 +19,13 @@ interface RoleData {
 
 const props = defineProps<{
     role?: RoleData;
-    permissions: { name: string; value: number }[];
+    permissions: { value: number; label: string }[];
 }>();
+
+// `@givanov95/vue-forms` Select renders `option.name`; the backend contract is `{ value, label }`.
+const permissionOptions = computed(() =>
+    props.permissions.map((permission) => ({ name: permission.label, value: permission.value })),
+);
 
 const isEdit = computed(() => !!props.role);
 
@@ -65,7 +70,7 @@ const submit = () => {
                     id="permissions"
                     name="permissions"
                     v-model="form.permissions"
-                    :options="permissions"
+                    :options="permissionOptions"
                     :placeholder="t('Select permissions')"
                     multiple
                     class="mt-1"
