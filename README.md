@@ -49,7 +49,7 @@ Vite must bundle the package source (it ships `.ts`/`.vue`, not a build):
 
 ```js
 // vite.config.ts — ssr.noExternal
-noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-forms']
+noExternal: ['@givanov95/vue-roles-permissions-crud']
 ```
 
 ## Backend wiring

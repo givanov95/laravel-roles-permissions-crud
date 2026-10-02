@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Link, useForm } from "@inertiajs/vue3";
 import { computed } from "vue";
-import Select from "@givanov95/vue-forms/components/Select.vue";
 
 import { r, t } from "../config";
 import InputError from "./ui/InputError.vue";
@@ -21,11 +20,6 @@ const props = defineProps<{
     role?: RoleData;
     permissions: { value: number; label: string }[];
 }>();
-
-// `@givanov95/vue-forms` Select renders `option.name`; the backend contract is `{ value, label }`.
-const permissionOptions = computed(() =>
-    props.permissions.map((permission) => ({ name: permission.label, value: permission.value })),
-);
 
 const isEdit = computed(() => !!props.role);
 
@@ -64,19 +58,26 @@ const submit = () => {
                 <InputError :message="form.errors.name" class="mt-1" />
             </div>
 
-            <div>
-                <InputLabel for="permissions" :value="t('Permissions')" />
-                <Select
-                    id="permissions"
-                    name="permissions"
-                    v-model="form.permissions"
-                    :options="permissionOptions"
-                    :placeholder="t('Select permissions')"
-                    multiple
-                    class="mt-1"
-                />
+            <fieldset>
+                <legend class="block text-sm font-medium text-gray-700">{{ t('Permissions') }}</legend>
+                <div class="mt-2 grid max-h-72 grid-cols-1 gap-x-4 gap-y-2 overflow-y-auto rounded-md border border-gray-300 p-3 sm:grid-cols-2">
+                    <label
+                        v-for="permission in permissions"
+                        :key="permission.value"
+                        class="flex items-center gap-2 text-sm text-gray-700"
+                    >
+                        <input
+                            v-model="form.permissions"
+                            type="checkbox"
+                            name="permissions[]"
+                            :value="permission.value"
+                            class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500"
+                        />
+                        <span>{{ permission.label }}</span>
+                    </label>
+                </div>
                 <InputError :message="form.errors.permissions" class="mt-1" />
-            </div>
+            </fieldset>
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-3">
