@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Security
+- The controllers now check `authorize_permissions` on every action (index, create,
+  edit and destroy were unchecked; store and update were checked only by their form
+  requests). Routes registered by hand instead of with `Route::rolesPermissionsCrud()`
+  were open to every logged-in user. A `null` value still skips the check.
+- Permissions can be protected like roles. `protected_permissions` (new, empty by default)
+  lists permissions that cannot be renamed or deleted, and the permissions named in
+  `authorize_permissions` are always protected: **behaviour change**, `view-roles` and
+  `view-permissions` can no longer be deleted or renamed through the UI. A protected
+  permission is reported with `is_protected` on the permissions index and edit pages, and
+  the Vue components hide its delete button and lock its name.
+- The `permissions.*` rule on roles only accepts permissions of the configured `guard`; one
+  from another guard used to end in an unhandled `PermissionDoesNotExist` (a 500).
+
 ### Changed
 - The npm package's `@inertiajs/vue3` peer dependency is now `^3.0.0`, matching the
   `inertiajs/inertia-laravel ^3.0` that `composer.json` already requires (it allowed

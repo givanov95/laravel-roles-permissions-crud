@@ -80,11 +80,13 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
 
 What an application gets without configuring anything:
 
-- The routes sit behind the configured `middleware` (`web`, `auth`, `verified` by default), and each resource behind `permission:view-roles` / `permission:view-permissions` (`authorize_permissions`). The form requests check the same permission for store and update.
+- The routes sit behind the configured `middleware` (`web`, `auth`, `verified` by default), and each resource behind `permission:view-roles` / `permission:view-permissions` (`authorize_permissions`). The controllers check the same permission themselves on every action, so routes you register by hand instead of with the macro are covered too.
 - `permission` is a middleware alias that spatie/laravel-permission does not register for you. Register it in your application (Laravel 11+: `$middleware->alias(['permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class])` in `bootstrap/app.php`), otherwise the routes cannot resolve it and requests fail.
-- Setting an `authorize_permissions` value to `null` drops that check, which leaves only `middleware`. Do that only when you guard the routes yourself.
+- Setting an `authorize_permissions` value to `null` drops that check everywhere (route middleware, form requests and controllers), which leaves only `middleware`. Do that only when you guard the routes yourself.
 - One permission guards reading **and** writing a resource: whoever may open the roles screen may also change roles and their permissions, their own included. Give `view-roles` and `view-permissions` only to people you would trust with everything. Separate read and write permissions are tracked in [#12](https://github.com/givanov95/laravel-roles-permissions-crud/issues/12).
-- `protected_roles` (empty by default, e.g. `['Administrator']`) lists roles that cannot be renamed or deleted; their set of permissions can still be edited. Permissions themselves are not protected yet, see [#13](https://github.com/givanov95/laravel-roles-permissions-crud/issues/13).
+- `protected_roles` (empty by default; list the roles your application's access depends on, e.g. `['Administrator']`) cannot be renamed or deleted; their set of permissions can still be edited.
+- `protected_permissions` (empty by default) lists permissions that cannot be renamed or deleted. The ones named in `authorize_permissions` (`view-roles`, `view-permissions`) are always protected, because deleting one would lock out whoever manages access. Add the permissions your own routes check.
+- A permission given to a role must exist for the configured `guard`; one from another guard is a validation error.
 
 ## Frontend wiring
 
