@@ -60,11 +60,13 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    php artisan vendor:publish --tag=roles-permissions-crud-config
    ```
 
-   Keys: `guard`, `authorize_permissions`, `protected_roles`, `prefix`,
-   `route_name_prefix`, `middleware`, `page_prefix`. Defaults gate the admin
-   area by the `view-roles` / `view-permissions` permissions
-   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`);
-   seed those permissions and grant them to your admin role.
+   Keys: `guard`, `authorize_permissions`, `prevent_privilege_escalation`,
+   `protected_roles`, `protected_permissions`, `prefix`, `route_name_prefix`,
+   `middleware`, `page_prefix`. Defaults gate the admin area by four permissions
+   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`):
+   `view-roles` and `view-permissions` to look, `manage-roles` and
+   `manage-permissions` to change. Seed them and grant them to your admin role;
+   whoever edits needs both the `view-*` and the `manage-*` permission.
 
 2. Register the routes in `routes/web.php`:
 
@@ -80,12 +82,12 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
 
 What an application gets without configuring anything:
 
-- The routes sit behind the configured `middleware` (`web`, `auth`, `verified` by default), and each resource behind `permission:view-roles` / `permission:view-permissions` (`authorize_permissions`). The controllers check the same permission themselves on every action, so routes you register by hand instead of with the macro are covered too.
+- The routes sit behind the configured `middleware` (`web`, `auth`, `verified` by default). Listing needs `view-roles` / `view-permissions`; opening a form or changing anything needs `manage-roles` / `manage-permissions` (`authorize_permissions`, see below). The form requests and the controllers check the same permissions themselves on every action, so routes you register by hand instead of with the macro are covered too.
 - `permission` is a middleware alias that spatie/laravel-permission does not register for you. Register it in your application (Laravel 11+: `$middleware->alias(['permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class])` in `bootstrap/app.php`), otherwise the routes cannot resolve it and requests fail.
-- Setting an `authorize_permissions` value to `null` drops that check everywhere (route middleware, form requests and controllers), which leaves only `middleware`. Do that only when you guard the routes yourself.
-- One permission guards reading **and** writing a resource: whoever may open the roles screen may also change roles and their permissions, their own included. Give `view-roles` and `view-permissions` only to people you would trust with everything. Separate read and write permissions are tracked in [#12](https://github.com/givanov95/laravel-roles-permissions-crud/issues/12).
-- `protected_roles` (empty by default; list the roles your application's access depends on, e.g. `['Administrator']`) cannot be renamed or deleted; their set of permissions can still be edited.
-- `protected_permissions` (empty by default) lists permissions that cannot be renamed or deleted. The ones named in `authorize_permissions` (`view-roles`, `view-permissions`) are always protected, because deleting one would lock out whoever manages access. Add the permissions your own routes check.
+- `authorize_permissions` takes, per resource, a `['view' => ..., 'manage' => ...]` pair (the default), a string (one permission for reading and writing, as before they were split) or `null`. A null part is not checked, and `null` drops the check everywhere (route middleware, form requests and controllers), which leaves only `middleware`; do that only when you guard the routes yourself.
+- **Nobody can hand out more than they hold** (`prevent_privilege_escalation`, on by default). A permission can be added to a role only by a user who holds it; a role can be opened for editing, edited or deleted only by a user who holds every permission it carries; the forms offer only the permissions the user holds, and the roles list says which roles are theirs to change (`can_manage`). A user counts as holding what they can do, so a super admin let through by `Gate::before` holds everything.
+- `protected_roles` (empty by default; list the roles your application's access depends on, e.g. `['Administrator']`) cannot be renamed or deleted and, while escalation is prevented, cannot lose permissions.
+- `protected_permissions` (empty by default) lists permissions that cannot be renamed or deleted. The ones named in `authorize_permissions` are always protected, because deleting one would lock out whoever manages access, and so, while escalation is prevented, are the permissions a protected role holds. Add the permissions your own routes check.
 - A permission given to a role must exist for the configured `guard`; one from another guard is a validation error.
 
 ## Frontend wiring
@@ -139,7 +141,7 @@ composer test      # PHPUnit on Orchestra Testbench
 composer analyse   # PHPStan (Larastan)
 ```
 
-`TestCase` switches the middleware and `authorize_permissions` off so the controllers can be tested on their own; `DefaultsTestCase` runs with the package defaults (access control, validation, protected roles, mass assignment, the permission cache). CI runs both commands on PHP 8.3 and 8.4 for every push to `main` and every pull request, and publishing to npm waits for it. It uses the newest Laravel that `composer.json` allows; Laravel 11 and 12 are not tested separately.
+`TestCase` switches the middleware, `authorize_permissions` and `prevent_privilege_escalation` off so the controllers can be tested on their own; `DefaultsTestCase` runs with the package defaults (access control, validation, protected roles, mass assignment, the permission cache). CI runs both commands on PHP 8.3 and 8.4 for every push to `main` and every pull request, and publishing to npm waits for it. It uses the newest Laravel that `composer.json` allows; Laravel 11 and 12 are not tested separately.
 
 ## License
 

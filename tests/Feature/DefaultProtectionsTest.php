@@ -58,8 +58,8 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
     public function test_each_screen_needs_its_own_permission(): void
     {
-        $rolesOnly = $this->userWith(['view-roles']);
-        $permissionsOnly = $this->userWith(['view-permissions']);
+        $rolesOnly = $this->userWith(['view-roles', 'manage-roles']);
+        $permissionsOnly = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $this->actingAs($rolesOnly)->get(route('admin.roles.index'), $this->inertia())->assertOk();
         $this->actingAs($rolesOnly)->get(route('admin.permissions.index'), $this->inertia())->assertForbidden();
@@ -73,7 +73,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     public function test_a_role_needs_a_unique_name_of_at_most_255_characters(): void
     {
         Role::create(['name' => 'editor', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-roles']);
+        $user = $this->userWith(['view-roles', 'manage-roles']);
 
         $this->actingAs($user)->post(route('admin.roles.store'), [])->assertSessionHasErrors('name');
         $this->actingAs($user)->post(route('admin.roles.store'), ['name' => 'editor'])->assertSessionHasErrors('name');
@@ -85,7 +85,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     {
         $editor = Role::create(['name' => 'editor', 'guard_name' => 'web']);
         Role::create(['name' => 'writer', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-roles']);
+        $user = $this->userWith(['view-roles', 'manage-roles']);
 
         $this->actingAs($user)->put(route('admin.roles.update', $editor), ['name' => 'editor'])->assertSessionHasNoErrors();
         $this->actingAs($user)->put(route('admin.roles.update', $editor), ['name' => 'writer'])->assertSessionHasErrors('name');
@@ -94,7 +94,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
     public function test_the_permissions_of_a_role_must_be_existing_ids(): void
     {
-        $user = $this->userWith(['view-roles']);
+        $user = $this->userWith(['view-roles', 'manage-roles']);
 
         $this->actingAs($user)
             ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => ['view-posts']])
@@ -109,7 +109,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     public function test_a_permission_needs_a_unique_name_of_at_most_255_characters(): void
     {
         $existing = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-permissions']);
+        $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $this->actingAs($user)->post(route('admin.permissions.store'), [])->assertSessionHasErrors('name');
         $this->actingAs($user)->post(route('admin.permissions.store'), ['name' => 'view-posts'])->assertSessionHasErrors('name');
@@ -124,7 +124,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
         config(['roles-permissions-crud.protected_roles' => ['super-admin']]);
         $role = Role::create(['name' => 'super-admin', 'guard_name' => 'web']);
         $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-roles']);
+        $user = $this->userWith(['view-roles', 'manage-roles', 'view-posts']);
 
         $this->actingAs($user)
             ->put(route('admin.roles.update', $role), ['name' => 'renamed', 'permissions' => [$permission->id]])
@@ -139,7 +139,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
         config(['roles-permissions-crud.protected_roles' => ['super-admin']]);
         $role = Role::create(['name' => 'super-admin', 'guard_name' => 'web']);
 
-        $this->actingAs($this->userWith(['view-roles']))
+        $this->actingAs($this->userWith(['view-roles', 'manage-roles']))
             ->delete(route('admin.roles.destroy', $role))
             ->assertRedirect(route('admin.roles.index'));
 
@@ -151,7 +151,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     public function test_the_permissions_that_guard_the_screens_cannot_be_deleted(): void
     {
         $guarding = Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-permissions']);
+        $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $this->actingAs($user)
             ->delete(route('admin.permissions.destroy', $guarding))
@@ -165,7 +165,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     {
         $guarding = Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
 
-        $this->actingAs($this->userWith(['view-permissions']))
+        $this->actingAs($this->userWith(['view-permissions', 'manage-permissions']))
             ->put(route('admin.permissions.update', $guarding), ['name' => 'renamed'])
             ->assertRedirect();
 
@@ -176,7 +176,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     {
         config(['roles-permissions-crud.protected_permissions' => ['reports.export']]);
         $protected = Permission::create(['name' => 'reports.export', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-permissions']);
+        $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $this->actingAs($user)->delete(route('admin.permissions.destroy', $protected))->assertInertiaFlash('toast.type', 'error');
         $this->actingAs($user)->put(route('admin.permissions.update', $protected), ['name' => 'renamed']);
@@ -188,7 +188,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     public function test_any_other_permission_can_still_be_renamed_and_deleted(): void
     {
         $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-permissions']);
+        $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $this->actingAs($user)->put(route('admin.permissions.update', $permission), ['name' => 'read-posts'])->assertRedirect();
         $this->assertSame('read-posts', $permission->fresh()->name);
@@ -203,7 +203,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
         Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
         Permission::create(['name' => 'reports.export', 'guard_name' => 'web']);
         $plain = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-permissions']);
+        $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
         $flags = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk()->json('props.permissions'))
             ->mapWithKeys(fn (array $permission) => [$permission['name'] => $permission['is_protected']])
@@ -228,7 +228,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
     {
         config(['auth.guards.api' => ['driver' => 'session', 'provider' => 'users']]);
         $other = Permission::create(['name' => 'api-only', 'guard_name' => 'api']);
-        $user = $this->userWith(['view-roles']);
+        $user = $this->userWith(['view-roles', 'manage-roles']);
 
         $this->actingAs($user)
             ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$other->id]])
@@ -246,7 +246,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
     public function test_a_role_ignores_attributes_it_was_not_asked_for(): void
     {
-        $this->actingAs($this->userWith(['view-roles']))
+        $this->actingAs($this->userWith(['view-roles', 'manage-roles']))
             ->post(route('admin.roles.store'), ['name' => 'editor', 'guard_name' => 'api', 'id' => 999999]);
 
         $role = Role::firstWhere('name', 'editor');
@@ -258,7 +258,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
     public function test_a_permission_ignores_attributes_it_was_not_asked_for(): void
     {
-        $this->actingAs($this->userWith(['view-permissions']))
+        $this->actingAs($this->userWith(['view-permissions', 'manage-permissions']))
             ->post(route('admin.permissions.store'), ['name' => 'view-posts', 'guard_name' => 'api', 'id' => 999999]);
 
         $permission = Permission::firstWhere('name', 'view-posts');
@@ -278,7 +278,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
         $this->assertFalse($editor->can('view-posts'), 'Warms the permission cache.');
 
-        $this->actingAs($this->userWith(['view-roles']))
+        $this->actingAs($this->userWith(['view-roles', 'manage-roles', 'view-posts']))
             ->put(route('admin.roles.update', $role), ['name' => 'editor', 'permissions' => [$permission->id]]);
 
         $this->assertTrue($editor->fresh()->can('view-posts'));

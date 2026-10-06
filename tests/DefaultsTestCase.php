@@ -10,6 +10,7 @@ use Illuminate\Routing\Router;
 use Inertia\ServiceProvider as InertiaServiceProvider;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
@@ -76,6 +77,17 @@ abstract class DefaultsTestCase extends \Orchestra\Testbench\TestCase
         }
 
         return $user->givePermissionTo($permissions);
+    }
+
+    /**
+     * A user holding every permission that exists at this point, through a role.
+     */
+    protected function userHoldingEverything(): User
+    {
+        $role = Role::findOrCreate('root', 'web');
+        $role->syncPermissions(Permission::all());
+
+        return $this->userWith()->assignRole($role);
     }
 
     /**

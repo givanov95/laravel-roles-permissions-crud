@@ -6,6 +6,7 @@ namespace Givanov95\RolesPermissionsCrud;
 
 use Givanov95\RolesPermissionsCrud\Http\Controllers\PermissionController;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\RoleController;
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -39,18 +40,24 @@ class RolesPermissionsCrudServiceProvider extends ServiceProvider
     {
         Route::macro('rolesPermissionsCrud', function () {
             $config = config('roles-permissions-crud');
-            $permissions = $config['authorize_permissions'] ?? [];
 
             Route::middleware($config['middleware'])
                 ->prefix($config['prefix'])
                 ->name($config['route_name_prefix'])
-                ->group(function () use ($permissions) {
+                ->group(function () {
+                    // Listing needs the view permission; opening a form or changing anything needs manage.
                     Route::resource('roles', RoleController::class)
-                        ->except(['show'])
-                        ->middleware(isset($permissions['roles']) ? ['permission:'.$permissions['roles']] : []);
+                        ->only('index')
+                        ->middleware(Authorizer::middleware('roles', Authorizer::VIEW));
+                    Route::resource('roles', RoleController::class)
+                        ->except(['index', 'show'])
+                        ->middleware(Authorizer::middleware('roles', Authorizer::MANAGE));
                     Route::resource('permissions', PermissionController::class)
-                        ->except(['show'])
-                        ->middleware(isset($permissions['permissions']) ? ['permission:'.$permissions['permissions']] : []);
+                        ->only('index')
+                        ->middleware(Authorizer::middleware('permissions', Authorizer::VIEW));
+                    Route::resource('permissions', PermissionController::class)
+                        ->except(['index', 'show'])
+                        ->middleware(Authorizer::middleware('permissions', Authorizer::MANAGE));
                 });
         });
     }

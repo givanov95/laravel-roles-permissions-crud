@@ -19,16 +19,47 @@ return [
     | Authorization permissions
     |--------------------------------------------------------------------------
     |
-    | The permission a user must have for each resource. Checked by the
-    | package FormRequests, and applied as `permission:` route middleware by
-    | the Route::rolesPermissionsCrud() macro. Set a value to null to skip
-    | the check for that resource (rely only on your own route middleware).
+    | The permission a user must have for each resource. Applied as `permission:`
+    | route middleware by the Route::rolesPermissionsCrud() macro, and checked
+    | again by the form requests and the controllers, so routes you register by
+    | hand are covered too.
+    |
+    | A resource takes one of:
+    |
+    |   - a view/manage pair: `view` is needed to list, `manage` to open a form
+    |     or change anything. `manage` does not include `view`; give both to
+    |     whoever edits. A null part is not checked.
+    |   - a string: one permission for reading and writing, as it was before
+    |     they were split (`'roles' => 'view-roles'`).
+    |   - null: nothing is checked, rely on your own route middleware.
     |
     */
     'authorize_permissions' => [
-        'roles'       => 'view-roles',
-        'permissions' => 'view-permissions',
+        'roles' => [
+            'view'   => 'view-roles',
+            'manage' => 'manage-roles',
+        ],
+        'permissions' => [
+            'view'   => 'view-permissions',
+            'manage' => 'manage-permissions',
+        ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent privilege escalation
+    |--------------------------------------------------------------------------
+    |
+    | While true, whoever may manage roles cannot hand out more than they hold:
+    | a permission can be added to a role only by a user who holds it, a role
+    | can be edited, deleted or opened for editing only by a user who holds
+    | every permission it carries, the forms offer only the permissions the
+    | user holds, a protected role cannot lose permissions, and a permission a
+    | protected role holds cannot be renamed or deleted. Set to false only if
+    | you enforce this yourself.
+    |
+    */
+    'prevent_privilege_escalation' => true,
 
     /*
     |--------------------------------------------------------------------------
