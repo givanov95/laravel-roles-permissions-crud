@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v6.0.0
 
 ### Breaking
 - **Reading and writing are separate permissions.** `authorize_permissions` now defaults to a
