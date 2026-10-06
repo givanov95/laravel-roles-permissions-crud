@@ -11,7 +11,15 @@ permissions:
   contents: read
 
 jobs:
+  # A tag publishes only if the tests and static analysis pass for it.
+  ci:
+    uses: givanov95/ci-workflows/.github/workflows/php-package.yml@v1
+    with:
+      php-versions: '["8.3", "8.4"]'
+      phpstan: true
+
   publish:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
