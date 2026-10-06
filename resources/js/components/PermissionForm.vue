@@ -10,7 +10,7 @@ import SecondaryButton from "./ui/SecondaryButton.vue";
 import TextInput from "./ui/TextInput.vue";
 
 const props = defineProps<{
-    permission?: { id: number; name: string };
+    permission?: { id: number; name: string; is_protected: boolean };
 }>();
 
 const isEdit = computed(() => !!props.permission);
@@ -33,7 +33,18 @@ const submit = () => {
     <form class="max-w-2xl rounded-lg bg-white p-6 shadow-sm" @submit.prevent="submit">
         <div>
             <InputLabel for="name" :value="t('Name')" />
-            <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
+            <TextInput
+                id="name"
+                v-model="form.name"
+                type="text"
+                class="mt-1 block w-full"
+                :disabled="permission?.is_protected ?? false"
+                required
+                :autofocus="!isEdit"
+            />
+            <p v-if="permission?.is_protected" class="mt-1 text-xs text-gray-500">
+                {{ t('This permission is protected; its name cannot be changed.') }}
+            </p>
             <InputError :message="form.errors.name" class="mt-1" />
         </div>
 

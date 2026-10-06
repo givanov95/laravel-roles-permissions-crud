@@ -27,7 +27,7 @@ class UpdateRoleRequest extends FormRequest
         return [
             'name'          => ['required', 'string', 'max:255', Rule::unique($table, 'name')->ignore($roleId)],
             'permissions'   => ['array'],
-            'permissions.*' => ['integer', 'exists:'.config('permission.table_names.permissions', 'permissions').',id'],
+            'permissions.*' => ['integer', Rule::exists(config('permission.table_names.permissions', 'permissions'), 'id')->where('guard_name', config('roles-permissions-crud.guard', 'web'))],
         ];
     }
 }

@@ -44,6 +44,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Protected permissions
+    |--------------------------------------------------------------------------
+    |
+    | Permissions that cannot be renamed or deleted through the UI. The ones named
+    | in `authorize_permissions` are always protected, because removing them would
+    | lock out whoever manages access; list any others your application depends on
+    | here (for example the ones its routes check).
+    |
+    */
+    'protected_permissions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Route registration (used by the Route::rolesPermissionsCrud() macro)
     |--------------------------------------------------------------------------
     |

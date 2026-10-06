@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRoleRequest extends FormRequest
 {
@@ -25,7 +26,7 @@ class StoreRoleRequest extends FormRequest
         return [
             'name'          => ['required', 'string', 'max:255', 'unique:'.$table.',name'],
             'permissions'   => ['array'],
-            'permissions.*' => ['integer', 'exists:'.config('permission.table_names.permissions', 'permissions').',id'],
+            'permissions.*' => ['integer', Rule::exists(config('permission.table_names.permissions', 'permissions'), 'id')->where('guard_name', config('roles-permissions-crud.guard', 'web'))],
         ];
     }
 }

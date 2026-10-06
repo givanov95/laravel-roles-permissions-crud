@@ -146,6 +146,102 @@ class DefaultProtectionsTest extends DefaultsTestCase
         $this->assertModelExists($role);
     }
 
+    // ---------------------------------------------------------------- protected permissions
+
+    public function test_the_permissions_that_guard_the_screens_cannot_be_deleted(): void
+    {
+        $guarding = Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
+        $user = $this->userWith(['view-permissions']);
+
+        $this->actingAs($user)
+            ->delete(route('admin.permissions.destroy', $guarding))
+            ->assertRedirect(route('admin.permissions.index'))
+            ->assertInertiaFlash('toast.type', 'error');
+
+        $this->assertModelExists($guarding);
+    }
+
+    public function test_the_permissions_that_guard_the_screens_cannot_be_renamed(): void
+    {
+        $guarding = Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
+
+        $this->actingAs($this->userWith(['view-permissions']))
+            ->put(route('admin.permissions.update', $guarding), ['name' => 'renamed'])
+            ->assertRedirect();
+
+        $this->assertSame('view-roles', $guarding->fresh()->name);
+    }
+
+    public function test_a_configured_protected_permission_cannot_be_deleted_or_renamed(): void
+    {
+        config(['roles-permissions-crud.protected_permissions' => ['reports.export']]);
+        $protected = Permission::create(['name' => 'reports.export', 'guard_name' => 'web']);
+        $user = $this->userWith(['view-permissions']);
+
+        $this->actingAs($user)->delete(route('admin.permissions.destroy', $protected))->assertInertiaFlash('toast.type', 'error');
+        $this->actingAs($user)->put(route('admin.permissions.update', $protected), ['name' => 'renamed']);
+
+        $this->assertModelExists($protected);
+        $this->assertSame('reports.export', $protected->fresh()->name);
+    }
+
+    public function test_any_other_permission_can_still_be_renamed_and_deleted(): void
+    {
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $user = $this->userWith(['view-permissions']);
+
+        $this->actingAs($user)->put(route('admin.permissions.update', $permission), ['name' => 'read-posts'])->assertRedirect();
+        $this->assertSame('read-posts', $permission->fresh()->name);
+
+        $this->actingAs($user)->delete(route('admin.permissions.destroy', $permission))->assertRedirect(route('admin.permissions.index'));
+        $this->assertModelMissing($permission);
+    }
+
+    public function test_the_screens_say_which_permissions_are_protected(): void
+    {
+        config(['roles-permissions-crud.protected_permissions' => ['reports.export']]);
+        Permission::create(['name' => 'view-roles', 'guard_name' => 'web']);
+        Permission::create(['name' => 'reports.export', 'guard_name' => 'web']);
+        $plain = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $user = $this->userWith(['view-permissions']);
+
+        $flags = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk()->json('props.permissions'))
+            ->mapWithKeys(fn (array $permission) => [$permission['name'] => $permission['is_protected']])
+            ->all();
+
+        $this->assertSame(true, $flags['view-roles']);
+        $this->assertSame(true, $flags['reports.export']);
+        $this->assertSame(true, $flags['view-permissions']);
+        $this->assertSame(false, $flags['view-posts']);
+
+        $this->actingAs($user)
+            ->getJson(route('admin.permissions.edit', $plain), $this->inertia())
+            ->assertJsonPath('props.permission.is_protected', false);
+        $this->actingAs($user)
+            ->getJson(route('admin.permissions.edit', Permission::firstWhere('name', 'view-roles')), $this->inertia())
+            ->assertJsonPath('props.permission.is_protected', true);
+    }
+
+    // ---------------------------------------------------------------- guards
+
+    public function test_a_permission_of_another_guard_is_a_validation_error_not_a_crash(): void
+    {
+        config(['auth.guards.api' => ['driver' => 'session', 'provider' => 'users']]);
+        $other = Permission::create(['name' => 'api-only', 'guard_name' => 'api']);
+        $user = $this->userWith(['view-roles']);
+
+        $this->actingAs($user)
+            ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$other->id]])
+            ->assertSessionHasErrors('permissions.0');
+
+        $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
+        $this->actingAs($user)
+            ->put(route('admin.roles.update', $role), ['name' => 'writer', 'permissions' => [$other->id]])
+            ->assertSessionHasErrors('permissions.0');
+
+        $this->assertDatabaseMissing('roles', ['name' => 'editor']);
+    }
+
     // ---------------------------------------------------------------- mass assignment
 
     public function test_a_role_ignores_attributes_it_was_not_asked_for(): void

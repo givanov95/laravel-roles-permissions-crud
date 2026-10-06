@@ -12,6 +12,7 @@ interface Permission {
     id: number;
     name: string;
     roles_count: number;
+    is_protected: boolean;
 }
 
 defineProps<{
@@ -59,7 +60,12 @@ const destroy = () => {
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
                 <tr v-for="permission in permissions" :key="permission.id">
-                    <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ permission.name }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                        {{ permission.name }}
+                        <span v-if="permission.is_protected" class="ms-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                            {{ t('Protected') }}
+                        </span>
+                    </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ permission.roles_count }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
@@ -70,6 +76,7 @@ const destroy = () => {
                                 {{ t('Edit') }}
                             </Link>
                             <button
+                                v-if="!permission.is_protected"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(permission)"

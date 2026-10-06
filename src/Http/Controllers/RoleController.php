@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 
+use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
 use Illuminate\Http\RedirectResponse;
@@ -16,6 +17,13 @@ use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
+    use AuthorizesCrudAccess;
+
+    public function __construct()
+    {
+        $this->middleware(self::crudAccess('roles'));
+    }
+
     public function index(): Response
     {
         // Count assignments via the pivot directly. Spatie's Role::users()
