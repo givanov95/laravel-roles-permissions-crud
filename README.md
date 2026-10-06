@@ -24,7 +24,7 @@ npm install @givanov95/vue-roles-permissions-crud
 
 ### Local development (path / file: link)
 
-Until the packages are published, link them locally.
+To work on the package alongside an application, link both from the application instead of installing the released versions.
 
 `composer.json`:
 
@@ -76,6 +76,16 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    `show`) under the configured prefix and middleware, with per-resource
    `permission:` middleware from `authorize_permissions`.
 
+## Security
+
+What an application gets without configuring anything:
+
+- The routes sit behind the configured `middleware` (`web`, `auth`, `verified` by default), and each resource behind `permission:view-roles` / `permission:view-permissions` (`authorize_permissions`). The form requests check the same permission for store and update.
+- `permission` is a middleware alias that spatie/laravel-permission does not register for you. Register it in your application (Laravel 11+: `$middleware->alias(['permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class])` in `bootstrap/app.php`), otherwise the routes cannot resolve it and requests fail.
+- Setting an `authorize_permissions` value to `null` drops that check, which leaves only `middleware`. Do that only when you guard the routes yourself.
+- One permission guards reading **and** writing a resource: whoever may open the roles screen may also change roles and their permissions, their own included. Give `view-roles` and `view-permissions` only to people you would trust with everything. Separate read and write permissions are tracked in [#12](https://github.com/givanov95/laravel-roles-permissions-crud/issues/12).
+- `protected_roles` (empty by default, e.g. `['Administrator']`) lists roles that cannot be renamed or deleted; their set of permissions can still be edited. Permissions themselves are not protected yet, see [#13](https://github.com/givanov95/laravel-roles-permissions-crud/issues/13).
+
 ## Frontend wiring
 
 1. Register the runtime config once in your app entrypoint:
@@ -119,6 +129,15 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    | `Admin/Permissions/Index`  | `PermissionsManager`  | `permissions`                  |
    | `Admin/Permissions/Create` | `PermissionForm`      | —                              |
    | `Admin/Permissions/Edit`   | `PermissionForm`      | `permission`                   |
+
+## Tests
+
+```bash
+composer test      # PHPUnit on Orchestra Testbench
+composer analyse   # PHPStan (Larastan)
+```
+
+`TestCase` switches the middleware and `authorize_permissions` off so the controllers can be tested on their own; `DefaultsTestCase` runs with the package defaults (access control, validation, protected roles, mass assignment, the permission cache). CI runs both commands on PHP 8.3 and 8.4 for every push to `main` and every pull request, and publishing to npm waits for it. It uses the newest Laravel that `composer.json` allows; Laravel 11 and 12 are not tested separately.
 
 ## License
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- The npm package's `@inertiajs/vue3` peer dependency is now `^3.0.0`, matching the
+  `inertiajs/inertia-laravel ^3.0` that `composer.json` already requires (it allowed
+  Inertia 1 and 2 before).
+
+### Added
+- CI: PHPUnit and PHPStan on PHP 8.3 and 8.4 for every push to `main` and every pull
+  request. Publishing to npm now waits for it.
+- Tests that run with the default `middleware` and `authorize_permissions`: access
+  control, validation, protected roles, mass assignment and the permission cache.
+- README: a Security section describing what the defaults protect, and a Tests section.
+
+### Removed
+- The outdated README sentence "until the packages are published, link them locally".
+
 ## v5.1.0
 
 ### Changed
