@@ -14,6 +14,7 @@ interface Role {
     users_count: number;
     permissions: string[];
     is_protected: boolean;
+    can_manage: boolean;
 }
 
 defineProps<{
@@ -84,13 +85,14 @@ const destroy = () => {
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
                             <Link
+                                v-if="role.can_manage"
                                 :href="(r('roles.edit', role.id) as string)"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm hover:bg-gray-50"
                             >
                                 {{ t('Edit') }}
                             </Link>
                             <button
-                                v-if="!role.is_protected"
+                                v-if="!role.is_protected && role.can_manage"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(role)"

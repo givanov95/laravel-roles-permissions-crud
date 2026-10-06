@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Http\Requests;
 
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,9 +12,7 @@ class UpdatePermissionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $permission = config('roles-permissions-crud.authorize_permissions.permissions');
-
-        return $permission === null || ($this->user()?->can($permission) ?? false);
+        return Authorizer::allows($this->user(), 'permissions', Authorizer::MANAGE);
     }
 
     /**

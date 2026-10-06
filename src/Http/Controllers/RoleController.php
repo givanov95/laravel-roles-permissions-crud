@@ -7,6 +7,7 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
+use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,9 @@ class RoleController extends Controller
             ->groupBy($roleKey)
             ->pluck('aggregate', $roleKey);
 
+        $user = request()->user();
+        $held = EscalationGuard::held($user);
+
         return Inertia::render($this->page('roles/Index'), [
             'roles' => Role::query()
                 ->with('permissions:id,name')
@@ -49,7 +53,8 @@ class RoleController extends Controller
                     'name'         => $role->name,
                     'users_count'  => (int) ($userCounts[$role->id] ?? 0),
                     'permissions'  => $role->permissions->pluck('name'),
-                    'is_protected' => $this->isProtected($role),
+                    'is_protected' => EscalationGuard::isProtectedRole($role),
+                    'can_manage'   => EscalationGuard::canManageRole($user, $role, $held),
                 ]),
         ]);
     }
@@ -80,14 +85,16 @@ class RoleController extends Controller
 
     public function edit(Role $role): Response
     {
+        abort_unless(EscalationGuard::canManageRole(request()->user(), $role), 403);
+
         return Inertia::render($this->page('roles/Edit'), [
             'role' => [
                 'id'           => $role->id,
                 'name'         => $role->name,
                 'permissions'  => $role->permissions->pluck('id'),
-                'is_protected' => $this->isProtected($role),
+                'is_protected' => EscalationGuard::isProtectedRole($role),
             ],
-            'permissions' => $this->permissionOptions(),
+            'permissions' => $this->permissionOptions($role),
         ]);
     }
 
@@ -95,7 +102,7 @@ class RoleController extends Controller
     {
         // Protected roles keep their name (it gates access) but their
         // permission set may still be adjusted.
-        if (! $this->isProtected($role)) {
+        if (! EscalationGuard::isProtectedRole($role)) {
             $role->update(['name' => $request->validated('name')]);
         }
 
@@ -111,7 +118,9 @@ class RoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
-        if ($this->isProtected($role)) {
+        abort_unless(EscalationGuard::canManageRole(request()->user(), $role), 403);
+
+        if (EscalationGuard::isProtectedRole($role)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is protected and cannot be deleted.')]);
 
             return redirect()->route($this->routeName('roles.index'));
@@ -124,29 +133,27 @@ class RoleController extends Controller
         return redirect()->route($this->routeName('roles.index'));
     }
 
-    private function isProtected(Role $role): bool
-    {
-        // Fall back to spatie's own protected_roles config when the package key
-        // is left empty, so apps that already define permission.protected_roles
-        // need no extra configuration.
-        $protected = config('roles-permissions-crud.protected_roles')
-            ?: config('permission.protected_roles', []);
-
-        return in_array($role->name, $protected, true);
-    }
-
     /**
+     * The permissions the form offers: only what the user holds while escalation is prevented, plus the
+     * ones the role already has, so that saving the form does not drop them.
+     *
      * @return array<int, array{value: int, label: string}>
      */
-    private function permissionOptions(): array
+    private function permissionOptions(?Role $role = null): array
     {
+        $held = EscalationGuard::held(request()->user());
+        $own = $role?->permissions->pluck('id') ?? collect();
+
         return Permission::query()
+            ->where('guard_name', config('roles-permissions-crud.guard', 'web'))
             ->orderBy('name')
             ->get(['id', 'name'])
+            ->filter(fn (Permission $permission) => ! EscalationGuard::enabled() || $held->contains($permission->id) || $own->contains($permission->id))
             ->map(fn (Permission $permission) => [
                 'value' => $permission->id,
                 'label' => $permission->name,
             ])
+            ->values()
             ->all();
     }
 

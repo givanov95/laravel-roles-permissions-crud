@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Breaking
+- **Reading and writing are separate permissions.** `authorize_permissions` now defaults to a
+  `view`/`manage` pair per resource: `view-roles` / `manage-roles` and `view-permissions` /
+  `manage-permissions`. `view` lists; `manage` opens a form or changes anything (create, store,
+  edit, update, destroy) and does not include `view`, so give both to whoever edits. Before, one
+  permission (`view-roles`) guarded both, which made it equal to full access.
+- **Privilege escalation is prevented by default** (`prevent_privilege_escalation`, new). Whoever
+  manages roles can add a permission to a role only if they hold it, can open, edit or delete a
+  role only if they hold every permission it carries, a protected role cannot lose permissions,
+  and a permission a protected role holds cannot be renamed or deleted. A user "holds" what they
+  can do, so a super admin let through by `Gate::before` holds everything. The roles index sends
+  `can_manage` for each role, the role forms offer only the permissions the user holds, and
+  `RolesManager` hides edit and delete for roles the user cannot manage.
+
+  **Upgrade:** create the `manage-roles` and `manage-permissions` permissions and give them to
+  whoever manages access, or keep the old behaviour by setting a string in your published config
+  (`'roles' => 'view-roles', 'permissions' => 'view-permissions'`). Set
+  `prevent_privilege_escalation` to `false` to turn the new checks off. Bump
+  `@givanov95/vue-roles-permissions-crud` together with the composer package.
+
+### Added
+- `authorize_permissions` also accepts a string (one permission for reading and writing) or
+  `null`, per resource; inside a pair a null part is not checked.
+- `prevent_privilege_escalation` config key.
+
 ### Security
 - The controllers now check `authorize_permissions` on every action (index, create,
   edit and destroy were unchecked; store and update were checked only by their form

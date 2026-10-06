@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Http\Requests;
 
+use Givanov95\RolesPermissionsCrud\Http\Requests\Concerns\ChecksPermissionGrants;
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
+use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateRoleRequest extends FormRequest
 {
+    use ChecksPermissionGrants;
+
     public function authorize(): bool
     {
-        $permission = config('roles-permissions-crud.authorize_permissions.roles');
+        $role = $this->route('role');
 
-        return $permission === null || ($this->user()?->can($permission) ?? false);
+        return Authorizer::allows($this->user(), 'roles', Authorizer::MANAGE)
+            && (! $role instanceof \Spatie\Permission\Models\Role || EscalationGuard::canManageRole($this->user(), $role));
     }
 
     /**

@@ -43,7 +43,7 @@ class ControllerAuthorizationTest extends ManualRoutesTestCase
     {
         $role = Role::create(['name' => 'editor', 'guard_name' => 'web']);
         $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
-        $user = $this->userWith(['view-roles', 'view-permissions']);
+        $user = $this->userWith(['view-roles', 'manage-roles', 'view-permissions', 'manage-permissions']);
 
         $this->actingAs($user)->get(route('admin.roles.index'), $this->inertia())->assertOk();
         $this->actingAs($user)->get(route('admin.roles.create'), $this->inertia())->assertOk();
