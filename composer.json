@@ -18,7 +18,7 @@
         "illuminate/routing": "^11.0|^12.0|^13.0",
         "illuminate/validation": "^11.0|^12.0|^13.0",
         "inertiajs/inertia-laravel": "^3.0",
-        "spatie/laravel-permission": "^6.0|^7.0"
+        "spatie/laravel-permission": "^6.0|^7.0|^8.0"
     },
     "require-dev": {
         "givanov95/laravel-git-hooks": "^1.1",

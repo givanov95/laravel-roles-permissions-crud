@@ -1,5 +1,11 @@
 # Changelog
 
+## v6.1.0
+
+### Added
+- `spatie/laravel-permission` ^8.0 is allowed (`^6.0|^7.0|^8.0`). The package's tests and PHPStan
+  pass against spatie 8.3; nothing in the package needed to change.
+
 ## v6.0.0
 
 ### Breaking
