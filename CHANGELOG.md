@@ -1,5 +1,19 @@
 # Changelog
 
+## v6.2.0
+
+### Added
+- **The configured models are used.** `RoleController` and `PermissionController` create, update
+  and delete through the classes in `permission.models.role` / `permission.models.permission`
+  instead of spatie's own, so an application model that extends them (observers, overridden
+  methods) sees the changes made in these screens. The routes still bind spatie's class, so they
+  keep working when cached; the bound model is switched to the configured class without another
+  query. With spatie's default models nothing changes.
+
+### Changed
+- `store`, `update` and `destroy` run in a database transaction: a role is not left behind, and
+  keeps its old name, when syncing its permissions fails.
+
 ## v6.1.0
 
 ### Added

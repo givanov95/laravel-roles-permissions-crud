@@ -8,8 +8,10 @@ use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAcces
 use Givanov95\RolesPermissionsCrud\Http\Requests\StorePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdatePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
@@ -28,7 +30,7 @@ class PermissionController extends Controller
         $protected = EscalationGuard::protectedPermissionNames();
 
         return Inertia::render($this->page('permissions/Index'), [
-            'permissions' => Permission::query()
+            'permissions' => Models::permissionClass()::query()
                 ->withCount('roles')
                 ->orderBy('name')
                 ->get()
@@ -48,10 +50,10 @@ class PermissionController extends Controller
 
     public function store(StorePermissionRequest $request): RedirectResponse
     {
-        Permission::create([
+        DB::transaction(fn () => Models::permissionClass()::create([
             'name'       => $request->validated('name'),
             'guard_name' => config('roles-permissions-crud.guard', 'web'),
-        ]);
+        ]));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been created.')]);
 
@@ -73,7 +75,7 @@ class PermissionController extends Controller
     {
         // A protected permission keeps its name: it gates access, so a rename would lock people out.
         if (! $this->isProtected($permission)) {
-            $permission->update(['name' => $request->validated('name')]);
+            DB::transaction(fn () => Models::permission($permission)->update(['name' => $request->validated('name')]));
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been updated.')]);
@@ -89,7 +91,7 @@ class PermissionController extends Controller
             return redirect()->route($this->routeName('permissions.index'));
         }
 
-        $permission->delete();
+        DB::transaction(fn () => Models::permission($permission)->delete());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been deleted.')]);
 
