@@ -78,6 +78,12 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    `show`) under the configured prefix and middleware, with per-resource
    `permission:` middleware from `authorize_permissions`.
 
+3. Your own models are used. The controllers create, update and delete roles and
+   permissions through the classes in `config/permission.php` (`models.role`,
+   `models.permission`), so a model that extends spatie's (observers, overridden
+   `delete()`, …) sees every change made in these screens. Each write, such as
+   creating a role together with its permissions, runs in one database transaction.
+
 ## Security
 
 What an application gets without configuring anything:

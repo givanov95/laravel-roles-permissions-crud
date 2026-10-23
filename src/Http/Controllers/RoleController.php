@@ -8,6 +8,7 @@ use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAcces
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,7 @@ class RoleController extends Controller
         $held = EscalationGuard::held($user);
 
         return Inertia::render($this->page('roles/Index'), [
-            'roles' => Role::query()
+            'roles' => Models::roleClass()::query()
                 ->with('permissions:id,name')
                 ->orderBy('name')
                 ->get()
@@ -68,15 +69,18 @@ class RoleController extends Controller
 
     public function store(StoreRoleRequest $request): RedirectResponse
     {
-        $role = Role::create([
-            'name'       => $request->validated('name'),
-            'guard_name' => config('roles-permissions-crud.guard', 'web'),
-        ]);
+        // One unit: a failed permission sync must not leave a role behind.
+        DB::transaction(function () use ($request): void {
+            $role = Models::roleClass()::create([
+                'name'       => $request->validated('name'),
+                'guard_name' => config('roles-permissions-crud.guard', 'web'),
+            ]);
 
-        // Cast to int: form values arrive as numeric strings and Spatie treats
-        // a string permission as a *name* (not an id), so "2" would be looked up
-        // by name and throw PermissionDoesNotExist. Ids must be integers.
-        $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+            // Cast to int: form values arrive as numeric strings and Spatie treats
+            // a string permission as a *name* (not an id), so "2" would be looked up
+            // by name and throw PermissionDoesNotExist. Ids must be integers.
+            $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been created.')]);
 
@@ -100,16 +104,20 @@ class RoleController extends Controller
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
-        // Protected roles keep their name (it gates access) but their
-        // permission set may still be adjusted.
-        if (! EscalationGuard::isProtectedRole($role)) {
-            $role->update(['name' => $request->validated('name')]);
-        }
+        $role = Models::role($role);
 
-        // Cast to int: form values arrive as numeric strings and Spatie treats
-        // a string permission as a *name* (not an id), so "2" would be looked up
-        // by name and throw PermissionDoesNotExist. Ids must be integers.
-        $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+        DB::transaction(function () use ($request, $role): void {
+            // Protected roles keep their name (it gates access) but their
+            // permission set may still be adjusted.
+            if (! EscalationGuard::isProtectedRole($role)) {
+                $role->update(['name' => $request->validated('name')]);
+            }
+
+            // Cast to int: form values arrive as numeric strings and Spatie treats
+            // a string permission as a *name* (not an id), so "2" would be looked up
+            // by name and throw PermissionDoesNotExist. Ids must be integers.
+            $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been updated.')]);
 
@@ -126,7 +134,7 @@ class RoleController extends Controller
             return redirect()->route($this->routeName('roles.index'));
         }
 
-        $role->delete();
+        DB::transaction(fn () => Models::role($role)->delete());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been deleted.')]);
 
@@ -144,7 +152,7 @@ class RoleController extends Controller
         $held = EscalationGuard::held(request()->user());
         $own = $role?->permissions->pluck('id') ?? collect();
 
-        return Permission::query()
+        return Models::permissionClass()::query()
             ->where('guard_name', config('roles-permissions-crud.guard', 'web'))
             ->orderBy('name')
             ->get(['id', 'name'])
