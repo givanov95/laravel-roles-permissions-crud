@@ -33,8 +33,7 @@ class RoleController extends Controller
         // relation resolves the related model from the *active* auth guard,
         // which during a request may be a token guard (no matching model) and
         // would blow up withCount(). Reading the pivot is guard-independent.
-        $pivotTable = config('permission.table_names.model_has_roles', 'model_has_roles');
-        $roleKey = config('permission.column_names.role_pivot_key') ?? 'role_id';
+        [$pivotTable, $roleKey] = Models::rolePivot();
 
         $userCounts = DB::table($pivotTable)
             ->select($roleKey)

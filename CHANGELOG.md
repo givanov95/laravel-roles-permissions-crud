@@ -13,12 +13,16 @@
 - The configured permission model (`permission.models.permission`) is used everywhere, including the
   escalation checks, which still read spatie's own class after v6.2.0.
 - **Renaming or deleting a permission respects escalation.** It is allowed only to a user who holds the
-  permission or may change every role that carries it (403 otherwise). Before, anyone with
-  `manage-permissions` could change roles beyond them this way.
+  permission, or when no role or user has it (403 otherwise). Before, anyone with
+  `manage-permissions` could change roles and users beyond them this way. A permission in use can be
+  renamed only to a name the user can use themselves, because the rename hands that name to everyone
+  who has the permission.
 - **Nobody locks themselves out.** A user cannot take away from their own role, or delete with it, a
   permission from `authorize_permissions` that they hold through nothing else.
 - The error for a permission the user does not hold is `The selected permission is invalid.`; it no
-  longer names the permissions, which let a user without `view-permissions` read names by id.
+  longer names the permissions, which let a user without `view-permissions` read names by id. An id
+  that does not exist in the guard gets the same error, on `permissions` instead of `permissions.N`,
+  so the error does not tell which ids exist.
 
 ### Changed
 - **A role or permission in use is not deleted** (new `allow_delete_in_use`, `false` by default): a role

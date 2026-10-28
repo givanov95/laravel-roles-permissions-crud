@@ -56,8 +56,8 @@ return [
     | every permission it carries, the forms offer only the permissions the
     | user holds, a protected role cannot lose permissions, and a permission a
     | protected role holds cannot be renamed or deleted. A permission can be
-    | renamed or deleted only by a user who holds it or may change every role
-    | that carries it, and nobody can take away from their own role, or delete,
+    | renamed or deleted only by a user who holds it or when nobody has it (and,
+    | in use, renamed only to a permission the user holds), and nobody can take away from their own role, or delete,
     | the permissions they manage access with. Set to false only if you enforce
     | this yourself.
     |

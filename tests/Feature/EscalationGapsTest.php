@@ -6,6 +6,7 @@ namespace Givanov95\RolesPermissionsCrud\Tests\Feature;
 
 use Givanov95\RolesPermissionsCrud\Tests\DefaultsTestCase;
 use Givanov95\RolesPermissionsCrud\Tests\Fixtures\User;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -49,15 +50,46 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertSame('delete-everything', $permission->fresh()->name);
     }
 
-    public function test_a_permission_the_user_holds_can_be_renamed(): void
+    public function test_a_permission_given_straight_to_another_user_cannot_be_changed_by_a_user_who_does_not_hold_it(): void
     {
+        $this->userWith(['delete-everything']);
+        $permission = Permission::findByName('delete-everything');
+        $manager = $this->permissionManager();
+
+        $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'harmless'])->assertForbidden();
+
+        $this->assertSame('delete-everything', $permission->fresh()->name);
+    }
+
+    public function test_a_permission_the_user_holds_can_be_deleted_from_roles_beyond_them(): void
+    {
+        config(['roles-permissions-crud.allow_delete_in_use' => true]);
         $this->role('boss', ['delete-everything', 'view-posts']);
         $permission = Permission::findByName('view-posts');
         $manager = $this->permissionManager('view-posts');
 
-        $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'read-posts'])->assertRedirect();
+        $this->actingAs($manager)->delete(route('admin.permissions.destroy', $permission))
+            ->assertInertiaFlash('toast.type', 'success');
 
-        $this->assertSame('read-posts', $permission->fresh()->name);
+        $this->assertModelMissing($permission);
+    }
+
+    public function test_a_permission_in_use_is_renamed_only_to_one_the_user_can_use(): void
+    {
+        // A rename hands the new name to everyone who has the permission.
+        $this->role('editor', ['view-posts']);
+        $permission = Permission::findByName('view-posts');
+        $manager = $this->permissionManager('view-posts');
+
+        $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'approve-payouts'])
+            ->assertSessionHasErrors(['name' => 'A permission in use can be renamed only to one you hold yourself.']);
+        $this->assertSame('view-posts', $permission->fresh()->name);
+
+        Gate::before(fn ($user) => $user->is($manager) ? true : null);
+
+        $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'approve-payouts'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('approve-payouts', $permission->fresh()->name);
     }
 
     public function test_a_permission_in_no_role_can_be_renamed_by_a_user_who_does_not_hold_it(): void

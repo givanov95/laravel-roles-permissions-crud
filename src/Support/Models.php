@@ -66,6 +66,19 @@ final class Models
     }
 
     /**
+     * The table that assigns roles to users (and other models) and its role key column.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function rolePivot(): array
+    {
+        return [
+            (string) config('permission.table_names.model_has_roles', 'model_has_roles'),
+            (string) (config('permission.column_names.role_pivot_key') ?? 'role_id'),
+        ];
+    }
+
+    /**
      * The route-bound role as the configured class. The route binds spatie's class, so that the routes
      * also work when cached; this swaps the instance without another query.
      */

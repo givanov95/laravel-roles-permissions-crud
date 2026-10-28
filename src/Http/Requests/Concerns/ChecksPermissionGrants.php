@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Requests\Concerns;
 
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Contracts\Validation\Validator;
 use Spatie\Permission\Contracts\Role;
 
@@ -24,10 +25,13 @@ trait ChecksPermissionGrants
             $role = $role instanceof Role ? $role : null;
             $requested = collect((array) $this->input('permissions', []))->map(fn (mixed $id) => (int) $id);
 
+            $unknown = $requested->diff(Models::permissions()->whereIn('id', $requested)->pluck('id'));
             $beyond = EscalationGuard::beyondTheUser($this->user(), $role, $requested);
 
-            // Without the names: they would tell a user who may not list the permissions what an id is.
-            if ($beyond->isNotEmpty()) {
+            // One message, without names, for an id that does not exist in the guard and one the user may
+            // not grant: otherwise the error would tell a user who may not list the permissions which ids
+            // exist and what they are called.
+            if ($unknown->isNotEmpty() || $beyond->isNotEmpty()) {
                 $validator->errors()->add('permissions', __('The selected permission is invalid.'));
 
                 return;

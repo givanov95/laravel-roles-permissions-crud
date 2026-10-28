@@ -55,23 +55,27 @@ final class EscalationGuard
     }
 
     /**
-     * A permission is the user's to rename or delete only if they hold it, or if every role that carries
-     * it is one they may change: otherwise renaming or deleting it would change roles beyond them.
-     *
-     * @param  Collection<int, int>|null  $held
+     * A permission is the user's to rename or delete only if they hold it, or if nobody has it: otherwise
+     * renaming or deleting it would change roles or users beyond them. (Every role that carries a
+     * permission the user does not hold is beyond them, so "nobody has it" is all that is left.)
      */
-    public static function canManagePermission(mixed $user, PermissionContract $permission, ?Collection $held = null): bool
+    public static function canManagePermission(mixed $user, PermissionContract $permission): bool
     {
-        if (! self::enabled()) {
-            return true;
-        }
+        return ! self::enabled()
+            || ($user instanceof Authorizable && $user->can($permission->name))
+            || ! self::permissionInUse($permission);
+    }
 
-        $held ??= self::held($user);
-
-        return $held->contains($permission->id)
-            || $permission->roles()->with('permissions:id')->get()->every(
-                fn (Model $role) => $role instanceof RoleContract && self::canManageRole($user, $role, $held)
-            );
+    /**
+     * A rename hands the new name to everyone who has the permission, so while it is in use the user may
+     * rename it only to a permission they can use themselves.
+     */
+    public static function canRenamePermission(mixed $user, PermissionContract $permission, string $name): bool
+    {
+        return ! self::enabled()
+            || $name === $permission->name
+            || ! self::permissionInUse($permission)
+            || ($user instanceof Authorizable && $user->can($name));
     }
 
     /**
@@ -115,9 +119,9 @@ final class EscalationGuard
      */
     public static function roleInUse(RoleContract $role): bool
     {
-        return DB::table(config('permission.table_names.model_has_roles', 'model_has_roles'))
-            ->where(config('permission.column_names.role_pivot_key') ?? 'role_id', $role->id)
-            ->exists();
+        [$table, $key] = Models::rolePivot();
+
+        return DB::table($table)->where($key, $role->id)->exists();
     }
 
     /**

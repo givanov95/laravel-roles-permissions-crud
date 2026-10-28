@@ -7,11 +7,27 @@ namespace Givanov95\RolesPermissionsCrud\Http\Requests;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdatePermissionRequest extends FormRequest
 {
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $permission = $this->route('permission');
+
+            if ($validator->errors()->isNotEmpty() || ! $permission instanceof \Spatie\Permission\Contracts\Permission) {
+                return;
+            }
+
+            if (! EscalationGuard::canRenamePermission($this->user(), $permission, (string) $this->input('name'))) {
+                $validator->errors()->add('name', __('A permission in use can be renamed only to one you hold yourself.'));
+            }
+        });
+    }
+
     public function authorize(): bool
     {
         $permission = $this->route('permission');
