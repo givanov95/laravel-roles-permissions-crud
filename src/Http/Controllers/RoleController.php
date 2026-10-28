@@ -135,6 +135,22 @@ class RoleController extends Controller
             return redirect()->route($this->routeName('roles.index'));
         }
 
+        $lost = EscalationGuard::locksOut(request()->user(), $role, collect());
+
+        if ($lost->isNotEmpty()) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
+                'permissions' => $lost->implode(', '),
+            ])]);
+
+            return redirect()->route($this->routeName('roles.index'));
+        }
+
+        if (! EscalationGuard::deletesInUse() && EscalationGuard::roleInUse($role)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is assigned and cannot be deleted. Take it away from everyone first.')]);
+
+            return redirect()->route($this->routeName('roles.index'));
+        }
+
         DB::transaction(fn () => Models::role($role)->delete());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been deleted.')]);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Requests\Concerns;
 
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
-use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Contracts\Validation\Validator;
 use Spatie\Permission\Contracts\Role;
 
@@ -27,10 +26,9 @@ trait ChecksPermissionGrants
 
             $beyond = EscalationGuard::beyondTheUser($this->user(), $role, $requested);
 
+            // Without the names: they would tell a user who may not list the permissions what an id is.
             if ($beyond->isNotEmpty()) {
-                $validator->errors()->add('permissions', __('You cannot grant permissions you do not hold: :permissions.', [
-                    'permissions' => Models::permissionClass()::query()->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
-                ]));
+                $validator->errors()->add('permissions', __('The selected permission is invalid.'));
 
                 return;
             }
@@ -38,6 +36,16 @@ trait ChecksPermissionGrants
             if (EscalationGuard::stripsProtectedRole($role, $requested)) {
                 $validator->errors()->add('permissions', __('The :role role is protected and cannot lose permissions.', [
                     'role' => $role?->name,
+                ]));
+
+                return;
+            }
+
+            $lost = $role === null ? collect() : EscalationGuard::locksOut($this->user(), $role, $requested);
+
+            if ($lost->isNotEmpty()) {
+                $validator->errors()->add('permissions', __('You cannot take :permissions away from your own role, you need them to manage access.', [
+                    'permissions' => $lost->implode(', '),
                 ]));
             }
         });

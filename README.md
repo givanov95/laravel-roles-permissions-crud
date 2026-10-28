@@ -61,7 +61,7 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    ```
 
    Keys: `guard`, `authorize_permissions`, `prevent_privilege_escalation`,
-   `protected_roles`, `protected_permissions`, `prefix`, `route_name_prefix`,
+   `protected_roles`, `protected_permissions`, `allow_delete_in_use`, `prefix`, `route_name_prefix`,
    `middleware`, `page_prefix`. Defaults gate the admin area by four permissions
    (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`):
    `view-roles` and `view-permissions` to look, `manage-roles` and
@@ -92,6 +92,10 @@ What an application gets without configuring anything:
 - `permission` is a middleware alias that spatie/laravel-permission does not register for you. Register it in your application (Laravel 11+: `$middleware->alias(['permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class])` in `bootstrap/app.php`), otherwise the routes cannot resolve it and requests fail.
 - `authorize_permissions` takes, per resource, a `['view' => ..., 'manage' => ...]` pair (the default), a string (one permission for reading and writing, as before they were split) or `null`. A null part is not checked, and `null` drops the check everywhere (route middleware, form requests and controllers), which leaves only `middleware`; do that only when you guard the routes yourself.
 - **Nobody can hand out more than they hold** (`prevent_privilege_escalation`, on by default). A permission can be added to a role only by a user who holds it; a role can be opened for editing, edited or deleted only by a user who holds every permission it carries; the forms offer only the permissions the user holds, and the roles list says which roles are theirs to change (`can_manage`). A user counts as holding what they can do, so a super admin let through by `Gate::before` holds everything.
+- A permission can be renamed or deleted only by a user who holds it, or who may change every role that carries it: otherwise the change would reach roles beyond them.
+- **Nobody locks themselves out.** While escalation is prevented, a user cannot take away from their own role, or delete with it, a permission from `authorize_permissions` that they hold through nothing else.
+- **Nothing in use is deleted by accident** (`allow_delete_in_use`, false by default). A role assigned to anyone, or a permission given to a role or straight to a user, is not deleted; the screen says so. Set it to true to delete them together with their assignments.
+- A validation error about a permission the user does not hold does not name it, so the form cannot be used to read the names behind ids.
 - `protected_roles` (empty by default; list the roles your application's access depends on, e.g. `['Administrator']`) cannot be renamed or deleted and, while escalation is prevented, cannot lose permissions.
 - `protected_permissions` (empty by default) lists permissions that cannot be renamed or deleted. The ones named in `authorize_permissions` are always protected, because deleting one would lock out whoever manages access, and so, while escalation is prevented, are the permissions a protected role holds. Add the permissions your own routes check.
 - The screens list and change only the roles and permissions of the configured `guard`. One of another guard is a 404 on edit, update and delete, a name only has to be unique within the guard, and a permission given to a role must exist for the guard (one from another guard is a validation error).

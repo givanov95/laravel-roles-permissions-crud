@@ -55,8 +55,11 @@ return [
     | can be edited, deleted or opened for editing only by a user who holds
     | every permission it carries, the forms offer only the permissions the
     | user holds, a protected role cannot lose permissions, and a permission a
-    | protected role holds cannot be renamed or deleted. Set to false only if
-    | you enforce this yourself.
+    | protected role holds cannot be renamed or deleted. A permission can be
+    | renamed or deleted only by a user who holds it or may change every role
+    | that carries it, and nobody can take away from their own role, or delete,
+    | the permissions they manage access with. Set to false only if you enforce
+    | this yourself.
     |
     */
     'prevent_privilege_escalation' => true,
@@ -85,6 +88,18 @@ return [
     |
     */
     'protected_permissions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete roles and permissions in use
+    |--------------------------------------------------------------------------
+    |
+    | While false, a role assigned to anyone or a permission given to a role or
+    | a user cannot be deleted: take it away first. Set to true to delete them
+    | and their assignments in one step.
+    |
+    */
+    'allow_delete_in_use' => false,
 
     /*
     |--------------------------------------------------------------------------

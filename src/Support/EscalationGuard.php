@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Contracts\Auth\Access\Authorizable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
 
@@ -50,6 +52,91 @@ final class EscalationGuard
     public static function canManageRole(mixed $user, RoleContract $role, ?Collection $held = null): bool
     {
         return ! self::enabled() || $role->permissions->pluck('id')->diff($held ?? self::held($user))->isEmpty();
+    }
+
+    /**
+     * A permission is the user's to rename or delete only if they hold it, or if every role that carries
+     * it is one they may change: otherwise renaming or deleting it would change roles beyond them.
+     *
+     * @param  Collection<int, int>|null  $held
+     */
+    public static function canManagePermission(mixed $user, PermissionContract $permission, ?Collection $held = null): bool
+    {
+        if (! self::enabled()) {
+            return true;
+        }
+
+        $held ??= self::held($user);
+
+        return $held->contains($permission->id)
+            || $permission->roles()->with('permissions:id')->get()->every(
+                fn (Model $role) => $role instanceof RoleContract && self::canManageRole($user, $role, $held)
+            );
+    }
+
+    /**
+     * The permissions that guard the screens (`authorize_permissions`) which the user would lose if the
+     * role, one of their own, ended up with only `$remaining` (none when it is deleted) and they hold
+     * them through nothing else. Whoever manages access cannot lock themselves out of it.
+     *
+     * @param  Collection<int, int>  $remaining
+     * @return Collection<int, string>
+     */
+    public static function locksOut(mixed $user, RoleContract $role, Collection $remaining): Collection
+    {
+        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+            return collect();
+        }
+
+        /** @var Collection<int, RoleContract&Model> $roles */
+        $roles = $user->roles()->where('guard_name', Models::guard())->with('permissions:id,name')->get();
+
+        if (! $roles->contains(fn (Model $own) => $own->getKey() === $role->getKey())) {
+            return collect();
+        }
+
+        $elsewhere = $user->permissions()->where('guard_name', Models::guard())->pluck('name')
+            ->merge($roles->reject(fn (Model $own) => $own->getKey() === $role->getKey())->flatMap(
+                fn (RoleContract $own) => $own->permissions->pluck('name')
+            ));
+
+        return $role->permissions
+            ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
+            ->pluck('name')
+            ->intersect(Authorizer::guardingPermissions())
+            ->diff($elsewhere)
+            ->sort()
+            ->values();
+    }
+
+    /**
+     * Whether a role is assigned to anyone. Read from the pivot, as the roles list does, because spatie's
+     * Role::users() resolves its model from the active auth guard.
+     */
+    public static function roleInUse(RoleContract $role): bool
+    {
+        return DB::table(config('permission.table_names.model_has_roles', 'model_has_roles'))
+            ->where(config('permission.column_names.role_pivot_key') ?? 'role_id', $role->id)
+            ->exists();
+    }
+
+    /**
+     * Whether a permission is given to a role or straight to anyone.
+     */
+    public static function permissionInUse(PermissionContract $permission): bool
+    {
+        return $permission->roles()->exists()
+            || DB::table(config('permission.table_names.model_has_permissions', 'model_has_permissions'))
+                ->where(config('permission.column_names.permission_pivot_key') ?? 'permission_id', $permission->id)
+                ->exists();
+    }
+
+    /**
+     * Whether a role or a permission that is in use may be deleted (`allow_delete_in_use`).
+     */
+    public static function deletesInUse(): bool
+    {
+        return (bool) config('roles-permissions-crud.allow_delete_in_use', false);
     }
 
     /**
