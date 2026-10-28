@@ -39,33 +39,24 @@ trait AuthorizesCrudAccess
             // Every bound parameter is looked at, so renamed route parameters are covered too.
             // The same for a role of another team (spatie teams): the current team's and the global ones
             // are there, as in the list.
-            foreach ($request->route()?->parameters() ?? [] as $parameter) {
-                abort_if(($parameter instanceof Role || $parameter instanceof Permission) && $parameter->guard_name !== Models::guard(), 404);
-                abort_if($parameter instanceof Role && ! self::ofCurrentTeam($parameter), 404);
-            }
-
+            //
             // Inside a team, what other teams share (every permission, the global roles) is read-only:
             // changing it would change their access too.
-            if ($ability === Authorizer::MANAGE && Models::inTeam()) {
-                abort_if($resource === 'permissions', 403);
+            $manageInTeam = $ability === Authorizer::MANAGE && Models::inTeam();
+            abort_if($manageInTeam && $resource === 'permissions', 403);
 
-                foreach ($request->route()?->parameters() ?? [] as $parameter) {
-                    abort_if($parameter instanceof Model && Models::sharedAcrossTeams($parameter), 403);
+            foreach ($request->route()?->parameters() ?? [] as $parameter) {
+                // Other parameters (a `{team}` of the application's routes, say) are not the package's.
+                if (! $parameter instanceof Model || ! ($parameter instanceof Role || $parameter instanceof Permission)) {
+                    continue;
                 }
+
+                abort_if($parameter->getAttribute('guard_name') !== Models::guard(), 404);
+                abort_if(! Models::visibleInTeam($parameter), 404);
+                abort_if($manageInTeam && Models::sharedAcrossTeams($parameter), 403);
             }
 
             return $next($request);
         };
-    }
-
-    private static function ofCurrentTeam(Role $role): bool
-    {
-        if (! Models::teams() || ! $role instanceof Model) {
-            return true;
-        }
-
-        $team = $role->getAttribute(Models::teamKey());
-
-        return $team === null || (string) $team === (string) Models::team();
     }
 }

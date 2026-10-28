@@ -51,10 +51,23 @@ class PermissionList extends ServerList
         $key = $permissions->getModel()->getQualifiedKeyName();
         [$pivot, $permissionKey] = Models::permissionPivot();
 
+        $direct = DB::table($pivot)->selectRaw('count(*)')->whereColumn("{$pivot}.{$permissionKey}", $key);
+
+        // Inside a team, what that team sees: the roles of the team and the global ones, and what is given
+        // straight to someone in the team. Other teams' set-up is not theirs to read.
+        if (Models::inTeam()) {
+            $direct->where("{$pivot}.".Models::teamKey(), Models::team());
+        }
+
         return $permissions
-            ->withCount('roles')
+            ->withCount(['roles' => fn (Builder $roles) => $roles->when(
+                Models::inTeam(),
+                fn (Builder $roles) => $roles->where(fn (Builder $roles) => $roles
+                    ->whereNull($roles->qualifyColumn(Models::teamKey()))
+                    ->orWhere($roles->qualifyColumn(Models::teamKey()), Models::team())),
+            )])
             // Given straight to users: with the roles, whether the permission is in use.
-            ->addSelect(['direct_count' => DB::table($pivot)->selectRaw('count(*)')->whereColumn("{$pivot}.{$permissionKey}", $key)]);
+            ->addSelect(['direct_count' => $direct]);
     }
 
     protected function row(Model $model, Request $request): array

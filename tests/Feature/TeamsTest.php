@@ -160,4 +160,60 @@ class TeamsTest extends TestCase
         setPermissionsTeamId(null);
         $this->getJson(route('admin.roles.index'), ['X-Inertia' => 'true'])->assertJsonPath('props.dataTable.data.0.users_count', 3);
     }
+
+    public function test_a_global_role_name_is_checked_against_every_team(): void
+    {
+        $this->role('editor', 1);
+        $global = $this->role('admin', null);
+        setPermissionsTeamId(null);
+
+        // A global role is seen in every team, so it cannot take a team's role name.
+        $this->post(route('admin.roles.store'), ['name' => 'editor'])->assertSessionHasErrors('name');
+        $this->put(route('admin.roles.update', $global), ['name' => 'editor'])->assertSessionHasErrors('name');
+    }
+
+    public function test_a_parameter_of_the_applications_own_routes_is_not_taken_for_a_shared_record(): void
+    {
+        // The application's routes may carry their own models, such as the team.
+        $this->app['router']->bind('team', fn (string $id) => new class extends \Illuminate\Database\Eloquent\Model {});
+        $this->app['router']->middleware('web')->get('teams/{team}/roles/create', [\Givanov95\RolesPermissionsCrud\Http\Controllers\RoleController::class, 'create']);
+        setPermissionsTeamId(1);
+
+        $this->get('teams/1/roles/create', ['X-Inertia' => 'true'])->assertOk();
+    }
+
+    public function test_a_team_cannot_make_a_role_with_a_protected_name(): void
+    {
+        // Such a role would be protected, and would protect its permissions for every team.
+        config(['roles-permissions-crud.protected_roles' => ['Owner']]);
+        $own = $this->role('editor', 2);
+        setPermissionsTeamId(2);
+
+        $this->post(route('admin.roles.store'), ['name' => 'Owner'])->assertSessionHasErrors('name');
+        $this->put(route('admin.roles.update', $own), ['name' => 'Owner'])->assertSessionHasErrors('name');
+        $this->assertDatabaseMissing('roles', ['name' => 'Owner']);
+    }
+
+    public function test_a_protected_role_the_application_made_for_a_team_keeps_its_name_on_save(): void
+    {
+        config(['roles-permissions-crud.protected_roles' => ['Owner']]);
+        $owner = $this->role('Owner', 2);
+        setPermissionsTeamId(2);
+
+        $this->put(route('admin.roles.update', $owner), ['name' => 'Owner', 'permissions' => []])->assertSessionHasNoErrors();
+    }
+
+    public function test_inside_a_team_the_permissions_count_only_what_the_team_sees(): void
+    {
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $this->role('admin', null)->givePermissionTo($permission);
+        $this->role('editor', 1)->givePermissionTo($permission);
+        $this->role('reviewer', 2)->givePermissionTo($permission);
+
+        setPermissionsTeamId(1);
+        $this->permissionsIndex()->assertJsonPath('props.dataTable.data.0.roles_count', 2);
+
+        setPermissionsTeamId(null);
+        $this->permissionsIndex()->assertJsonPath('props.dataTable.data.0.roles_count', 3);
+    }
 }

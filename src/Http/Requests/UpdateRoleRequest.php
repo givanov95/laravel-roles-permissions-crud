@@ -30,7 +30,7 @@ class UpdateRoleRequest extends FormRequest
         $roleId = $this->route('role')?->id;
 
         return [
-            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()->ignore($roleId)],
+            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()->ignore($roleId), ...($this->input('name') === $this->route('role')?->name ? [] : Models::reservedRoleNameRule())],
             'permissions'   => ['array'],
             // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
             'permissions.*' => ['integer'],

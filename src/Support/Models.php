@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Spatie\Permission\Contracts\Permission as PermissionContract;
+use Spatie\Permission\Contracts\Role as RoleContract;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -71,23 +73,50 @@ final class Models
     }
 
     /**
-     * The rule that a role name is free: within the guard and, with teams, among the roles of the current
-     * team and the global ones, the ones spatie's Role::create() checks.
+     * The rule that a role name is free within the guard. With teams, inside a team: among the team's
+     * roles and the global ones, which spatie's Role::create() checks. Outside any team, where a global
+     * role is made: among every role, since a global role is seen in every team and must not share a
+     * name with a team's own.
      */
     public static function uniqueRoleName(): Unique
     {
         $rule = Rule::unique(self::roleClass(), 'name')->where('guard_name', self::guard());
 
-        if (self::teams()) {
+        if (self::inTeam()) {
             $key = self::teamKey();
             $team = self::team();
 
-            $rule->where(fn (QueryBuilder $query) => $team === null
-                ? $query->whereNull($key)
-                : $query->where(fn (QueryBuilder $query) => $query->whereNull($key)->orWhere($key, $team)));
+            $rule->where(fn (QueryBuilder $query) => $query->whereNull($key)->orWhere($key, $team));
         }
 
         return $rule;
+    }
+
+    /**
+     * With teams, the names of `protected_roles` are reserved: a team cannot make a role of that name
+     * through the screens (or rename one to it), which would make it protected and protect its
+     * permissions for every team. The application creates those roles itself.
+     *
+     * @return array<int, mixed>
+     */
+    public static function reservedRoleNameRule(): array
+    {
+        return self::teams() ? [Rule::notIn(EscalationGuard::protectedRoles())] : [];
+    }
+
+    /**
+     * Whether a role is one the screens show here: without teams, any; with teams, a global one or one
+     * of the current team (as {@see roles()} lists them). A permission has no team.
+     */
+    public static function visibleInTeam(Model $record): bool
+    {
+        if (! self::teams() || ! $record instanceof RoleContract) {
+            return true;
+        }
+
+        $team = $record->getAttribute(self::teamKey());
+
+        return $team === null || (self::team() !== null && (string) $team === (string) self::team());
     }
 
     /**
@@ -131,7 +160,8 @@ final class Models
             return false;
         }
 
-        return ! $record instanceof Role || $record->getAttribute(self::teamKey()) === null;
+        return $record instanceof PermissionContract
+            || ($record instanceof RoleContract && $record->getAttribute(self::teamKey()) === null);
     }
 
     /**
