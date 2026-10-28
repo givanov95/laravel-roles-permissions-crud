@@ -94,8 +94,8 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
 
    | List        | Search | Sort                   | Row fields                                                                 |
    | ----------- | ------ | ---------------------- | -------------------------------------------------------------------------- |
-   | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `permissions`, `is_protected`, `can_manage`   |
-   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `is_protected`, `can_manage`                  |
+   | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `others_count`, `permissions`, `is_protected`, `can_manage`, `can_delete` |
+   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `direct_count`, `is_protected`, `can_manage`, `can_delete`               |
 
    They are sorted by name by default, and the page size is `default_per_page` in
    `config/data-table.php`. `users_count` counts only the guard's user model. To change the query,
@@ -113,8 +113,11 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    shadow a prop your application shares: `routeNamePrefix` (`route_name_prefix`) and, on the lists,
    `canCreate` (whether the user may add). `can_manage` on a row says whether the user may open, edit
    and delete it: the `manage-*` permission and, while escalation is prevented, a record within their
-   reach. The components read these from the page, so the shells do not forward them, and show only
-   the buttons that lead somewhere.
+   reach. `can_delete` adds what a delete checks: not protected, and not in use unless
+   `allow_delete_in_use` (`others_count`, models other than users that have the role, and
+   `direct_count`, users given the permission straight, show what keeps a record in use). The
+   components read these from the page, so the shells do not forward them, and show only the buttons
+   that lead somewhere.
 
 ## Security
 

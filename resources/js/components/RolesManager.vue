@@ -17,10 +17,16 @@ interface Role {
     id: number;
     name: string;
     users_count: number;
+    /** Other models that have the role (missing from an older server). */
+    others_count?: number;
     permissions: string[];
     is_protected: boolean;
     can_manage: boolean;
+    /** Whether a delete would go through (missing from an older server: decided here as before). */
+    can_delete?: boolean;
 }
+
+const canDelete = (role: Role): boolean => role.can_delete ?? (!role.is_protected && role.can_manage);
 
 const props = defineProps<{
     /** `RoleController::index()`: paged, searched and sorted on the server. */
@@ -105,7 +111,10 @@ const destroy = () => {
                             </span>
                         </div>
                     </td>
-                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ role.users_count }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                        {{ role.users_count }}
+                        <span v-if="role.others_count" class="text-xs text-gray-400">· {{ t(':count others', { count: role.others_count }) }}</span>
+                    </td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
                             <Link
@@ -116,7 +125,7 @@ const destroy = () => {
                                 {{ t('Edit') }}
                             </Link>
                             <button
-                                v-if="!role.is_protected && role.can_manage"
+                                v-if="canDelete(role)"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(role)"

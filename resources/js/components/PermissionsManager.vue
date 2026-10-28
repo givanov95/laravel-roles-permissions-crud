@@ -17,10 +17,17 @@ interface Permission {
     id: number;
     name: string;
     roles_count: number;
+    /** Given straight to users (missing from an older server). */
+    direct_count?: number;
     is_protected: boolean;
     /** Whether the user may open, edit and delete it (missing from an older server: allowed). */
     can_manage?: boolean;
+    /** Whether a delete would go through (missing from an older server: decided here as before). */
+    can_delete?: boolean;
 }
+
+const canDelete = (permission: Permission): boolean =>
+    permission.can_delete ?? (!permission.is_protected && permission.can_manage !== false);
 
 const props = defineProps<{
     /** `PermissionController::index()`: paged, searched and sorted on the server. */
@@ -92,7 +99,10 @@ const destroy = () => {
                             {{ t('Protected') }}
                         </span>
                     </td>
-                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ permission.roles_count }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                        {{ permission.roles_count }}
+                        <span v-if="permission.direct_count" class="text-xs text-gray-400">· {{ t(':count direct', { count: permission.direct_count }) }}</span>
+                    </td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
                             <Link
@@ -103,7 +113,7 @@ const destroy = () => {
                                 {{ t('Edit') }}
                             </Link>
                             <button
-                                v-if="!permission.is_protected && permission.can_manage !== false"
+                                v-if="canDelete(permission)"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(permission)"
