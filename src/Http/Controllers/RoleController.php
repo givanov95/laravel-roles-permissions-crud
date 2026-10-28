@@ -33,8 +33,7 @@ class RoleController extends Controller
         // relation resolves the related model from the *active* auth guard,
         // which during a request may be a token guard (no matching model) and
         // would blow up withCount(). Reading the pivot is guard-independent.
-        $pivotTable = config('permission.table_names.model_has_roles', 'model_has_roles');
-        $roleKey = config('permission.column_names.role_pivot_key') ?? 'role_id';
+        [$pivotTable, $roleKey] = Models::rolePivot();
 
         $userCounts = DB::table($pivotTable)
             ->select($roleKey)
@@ -131,6 +130,22 @@ class RoleController extends Controller
 
         if (EscalationGuard::isProtectedRole($role)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is protected and cannot be deleted.')]);
+
+            return redirect()->route($this->routeName('roles.index'));
+        }
+
+        $lost = EscalationGuard::locksOut(request()->user(), $role, collect());
+
+        if ($lost->isNotEmpty()) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
+                'permissions' => $lost->implode(', '),
+            ])]);
+
+            return redirect()->route($this->routeName('roles.index'));
+        }
+
+        if (! EscalationGuard::deletesInUse() && EscalationGuard::roleInUse($role)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is assigned and cannot be deleted. Take it away from everyone first.')]);
 
             return redirect()->route($this->routeName('roles.index'));
         }

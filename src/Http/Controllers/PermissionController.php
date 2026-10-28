@@ -63,6 +63,8 @@ class PermissionController extends Controller
 
     public function edit(Permission $permission): Response
     {
+        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
+
         return Inertia::render($this->page('permissions/Edit'), [
             'permission' => [
                 'id'           => $permission->id,
@@ -86,8 +88,16 @@ class PermissionController extends Controller
 
     public function destroy(Permission $permission): RedirectResponse
     {
+        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
+
         if ($this->isProtected($permission)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is protected and cannot be deleted.')]);
+
+            return redirect()->route($this->routeName('permissions.index'));
+        }
+
+        if (! EscalationGuard::deletesInUse() && EscalationGuard::permissionInUse($permission)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is in use and cannot be deleted. Take it away from every role and user first.')]);
 
             return redirect()->route($this->routeName('permissions.index'));
         }

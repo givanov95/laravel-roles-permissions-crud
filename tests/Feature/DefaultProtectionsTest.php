@@ -101,7 +101,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
             ->assertSessionHasErrors('permissions.0');
         $this->actingAs($user)
             ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [999999]])
-            ->assertSessionHasErrors('permissions.0');
+            ->assertSessionHasErrors('permissions');
 
         $this->assertDatabaseMissing('roles', ['name' => 'editor']);
     }
@@ -232,12 +232,12 @@ class DefaultProtectionsTest extends DefaultsTestCase
 
         $this->actingAs($user)
             ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$other->id]])
-            ->assertSessionHasErrors('permissions.0');
+            ->assertSessionHasErrors('permissions');
 
         $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
         $this->actingAs($user)
             ->put(route('admin.roles.update', $role), ['name' => 'writer', 'permissions' => [$other->id]])
-            ->assertSessionHasErrors('permissions.0');
+            ->assertSessionHasErrors('permissions');
 
         $this->assertDatabaseMissing('roles', ['name' => 'editor']);
     }

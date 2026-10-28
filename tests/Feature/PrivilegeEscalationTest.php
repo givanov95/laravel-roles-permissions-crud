@@ -156,7 +156,8 @@ class PrivilegeEscalationTest extends DefaultsTestCase
         config(['roles-permissions-crud.protected_roles' => ['super-admin']]);
         $this->role('super-admin', ['reports.export']);
         $permission = Permission::findByName('reports.export');
-        $manager = $this->userWith(['view-permissions', 'manage-permissions']);
+        // Holds the permission, so it is the role's protection that stops them, not the escalation check.
+        $manager = $this->userWith(['view-permissions', 'manage-permissions', 'reports.export']);
 
         $this->actingAs($manager)->delete(route('admin.permissions.destroy', $permission))->assertInertiaFlash('toast.type', 'error');
         $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'renamed']);

@@ -33,7 +33,8 @@ class UpdateRoleRequest extends FormRequest
         return [
             'name'          => ['required', 'string', 'max:255', Rule::unique(Models::roleClass(), 'name')->where('guard_name', Models::guard())->ignore($roleId)],
             'permissions'   => ['array'],
-            'permissions.*' => ['integer', Rule::exists(Models::permissionClass(), 'id')->where('guard_name', Models::guard())],
+            // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
+            'permissions.*' => ['integer'],
         ];
     }
 }

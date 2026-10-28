@@ -25,12 +25,14 @@ trait ChecksPermissionGrants
             $role = $role instanceof Role ? $role : null;
             $requested = collect((array) $this->input('permissions', []))->map(fn (mixed $id) => (int) $id);
 
+            $unknown = $requested->diff(Models::permissions()->whereIn('id', $requested)->pluck('id'));
             $beyond = EscalationGuard::beyondTheUser($this->user(), $role, $requested);
 
-            if ($beyond->isNotEmpty()) {
-                $validator->errors()->add('permissions', __('You cannot grant permissions you do not hold: :permissions.', [
-                    'permissions' => Models::permissionClass()::query()->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
-                ]));
+            // One message, without names, for an id that does not exist in the guard and one the user may
+            // not grant: otherwise the error would tell a user who may not list the permissions which ids
+            // exist and what they are called.
+            if ($unknown->isNotEmpty() || $beyond->isNotEmpty()) {
+                $validator->errors()->add('permissions', __('The selected permission is invalid.'));
 
                 return;
             }
@@ -38,6 +40,16 @@ trait ChecksPermissionGrants
             if (EscalationGuard::stripsProtectedRole($role, $requested)) {
                 $validator->errors()->add('permissions', __('The :role role is protected and cannot lose permissions.', [
                     'role' => $role?->name,
+                ]));
+
+                return;
+            }
+
+            $lost = $role === null ? collect() : EscalationGuard::locksOut($this->user(), $role, $requested);
+
+            if ($lost->isNotEmpty()) {
+                $validator->errors()->add('permissions', __('You cannot take :permissions away from your own role, you need them to manage access.', [
+                    'permissions' => $lost->implode(', '),
                 ]));
             }
         });
