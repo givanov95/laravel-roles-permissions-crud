@@ -20,7 +20,7 @@ class UpdateRoleRequest extends FormRequest
         $role = $this->route('role');
 
         return Authorizer::allows($this->user(), 'roles', Authorizer::MANAGE)
-            && (! $role instanceof \Spatie\Permission\Models\Role || EscalationGuard::canManageRole($this->user(), $role));
+            && (! $role instanceof \Spatie\Permission\Contracts\Role || EscalationGuard::canManageRole($this->user(), $role));
     }
 
     /**
@@ -29,12 +29,11 @@ class UpdateRoleRequest extends FormRequest
     public function rules(): array
     {
         $roleId = $this->route('role')?->id;
-        $table = config('permission.table_names.roles', 'roles');
 
         return [
-            'name'          => ['required', 'string', 'max:255', Rule::unique($table, 'name')->where('guard_name', Models::guard())->ignore($roleId)],
+            'name'          => ['required', 'string', 'max:255', Rule::unique(Models::roleClass(), 'name')->where('guard_name', Models::guard())->ignore($roleId)],
             'permissions'   => ['array'],
-            'permissions.*' => ['integer', Rule::exists(config('permission.table_names.permissions', 'permissions'), 'id')->where('guard_name', Models::guard())],
+            'permissions.*' => ['integer', Rule::exists(Models::permissionClass(), 'id')->where('guard_name', Models::guard())],
         ];
     }
 }

@@ -7,7 +7,7 @@ namespace Givanov95\RolesPermissionsCrud\Support;
 use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Support\Collection;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
-use Spatie\Permission\Models\Role;
+use Spatie\Permission\Contracts\Role as RoleContract;
 
 /**
  * Keeps whoever may manage roles from handing out more than they hold, changing a role that is
@@ -34,8 +34,7 @@ final class EscalationGuard
             return collect();
         }
 
-        return Models::permissionClass()::query()
-            ->where('guard_name', Models::guard())
+        return Models::permissions()
             ->get(['id', 'name'])
             ->filter(fn (PermissionContract $permission) => $user->can($permission->name))
             ->pluck('id')
@@ -48,7 +47,7 @@ final class EscalationGuard
      *
      * @param  Collection<int, int>|null  $held
      */
-    public static function canManageRole(mixed $user, Role $role, ?Collection $held = null): bool
+    public static function canManageRole(mixed $user, RoleContract $role, ?Collection $held = null): bool
     {
         return ! self::enabled() || $role->permissions->pluck('id')->diff($held ?? self::held($user))->isEmpty();
     }
@@ -59,7 +58,7 @@ final class EscalationGuard
      * @param  Collection<int, int>  $requested
      * @return Collection<int, int>
      */
-    public static function beyondTheUser(mixed $user, ?Role $role, Collection $requested): Collection
+    public static function beyondTheUser(mixed $user, ?RoleContract $role, Collection $requested): Collection
     {
         if (! self::enabled()) {
             return collect();
@@ -76,7 +75,7 @@ final class EscalationGuard
      *
      * @param  Collection<int, int>  $requested
      */
-    public static function stripsProtectedRole(?Role $role, Collection $requested): bool
+    public static function stripsProtectedRole(?RoleContract $role, Collection $requested): bool
     {
         return self::enabled()
             && $role !== null
@@ -84,7 +83,7 @@ final class EscalationGuard
             && $role->permissions->pluck('id')->diff($requested)->isNotEmpty();
     }
 
-    public static function isProtectedRole(Role $role): bool
+    public static function isProtectedRole(RoleContract $role): bool
     {
         // Fall back to spatie's own protected_roles config when the package key is left empty, so apps
         // that already define permission.protected_roles need no extra configuration.
@@ -117,8 +116,7 @@ final class EscalationGuard
         if (self::enabled() && self::protectedRoles() !== []) {
             $names = [
                 ...$names,
-                ...Models::permissionClass()::query()
-                    ->where('guard_name', Models::guard())
+                ...Models::permissions()
                     ->whereHas('roles', fn ($query) => $query->whereIn('name', self::protectedRoles()))
                     ->pluck('name')
                     ->all(),

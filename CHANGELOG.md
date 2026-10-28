@@ -7,8 +7,9 @@
   `roles-permissions-crud.guard`. Editing, updating or deleting a role or permission of another
   guard is a 404; before, it could be renamed or deleted, and saving a role of another guard with
   this guard's permissions was a 500.
-- A name has to be unique only within the guard, as in spatie's schema (`unique(name, guard_name)`):
-  an `editor` role for `web` is accepted when there is one for `api`.
+- A name has to be unique only within the guard: an `editor` role for `web` is accepted when there is
+  one for `api`. The unique and exists rules use the configured models' table and connection.
+- An empty `guard` falls back to the application's default guard (`auth.defaults.guard`).
 - The configured permission model (`permission.models.permission`) is used everywhere, including the
   escalation checks, which still read spatie's own class after v6.2.0.
 

@@ -46,8 +46,7 @@ class RoleController extends Controller
         $held = EscalationGuard::held($user);
 
         return Inertia::render($this->page('roles/Index'), [
-            'roles' => Models::roleClass()::query()
-                ->where('guard_name', Models::guard())
+            'roles' => Models::roles()
                 ->with('permissions:id,name')
                 ->orderBy('name')
                 ->get()
@@ -154,8 +153,7 @@ class RoleController extends Controller
         $held = EscalationGuard::held(request()->user());
         $own = $role?->permissions->pluck('id') ?? collect();
 
-        return Models::permissionClass()::query()
-            ->where('guard_name', Models::guard())
+        return Models::permissions()
             ->orderBy('name')
             ->get(['id', 'name'])
             ->filter(fn (PermissionContract $permission) => ! EscalationGuard::enabled() || $held->contains($permission->id) || $own->contains($permission->id))

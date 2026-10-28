@@ -22,10 +22,9 @@ class UpdatePermissionRequest extends FormRequest
     public function rules(): array
     {
         $permissionId = $this->route('permission')?->id;
-        $table = config('permission.table_names.permissions', 'permissions');
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique($table, 'name')->where('guard_name', Models::guard())->ignore($permissionId)],
+            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())->ignore($permissionId)],
         ];
     }
 }

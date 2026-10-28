@@ -21,10 +21,9 @@ class StorePermissionRequest extends FormRequest
      */
     public function rules(): array
     {
-        $table = config('permission.table_names.permissions', 'permissions');
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique($table, 'name')->where('guard_name', Models::guard())],
+            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())],
         ];
     }
 }

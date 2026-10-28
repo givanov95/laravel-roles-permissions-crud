@@ -7,7 +7,7 @@ namespace Givanov95\RolesPermissionsCrud\Http\Requests\Concerns;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Contracts\Validation\Validator;
-use Spatie\Permission\Models\Role;
+use Spatie\Permission\Contracts\Role;
 
 /**
  * The checks on the permissions submitted for a role, done after the ordinary rules have passed.
@@ -29,7 +29,7 @@ trait ChecksPermissionGrants
 
             if ($beyond->isNotEmpty()) {
                 $validator->errors()->add('permissions', __('You cannot grant permissions you do not hold: :permissions.', [
-                    'permissions' => Models::permissionClass()::query()->where('guard_name', Models::guard())->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
+                    'permissions' => Models::permissionClass()::query()->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
                 ]));
 
                 return;

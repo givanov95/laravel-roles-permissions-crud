@@ -31,8 +31,7 @@ class PermissionController extends Controller
         $protected = EscalationGuard::protectedPermissionNames();
 
         return Inertia::render($this->page('permissions/Index'), [
-            'permissions' => Models::permissionClass()::query()
-                ->where('guard_name', Models::guard())
+            'permissions' => Models::permissions()
                 ->withCount('roles')
                 ->orderBy('name')
                 ->get()
