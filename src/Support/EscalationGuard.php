@@ -152,6 +152,58 @@ final class EscalationGuard
     }
 
     /**
+     * Why the user cannot delete a role, or null when they can. Beyond {@see canManageRole()}, which is a
+     * 403 of its own. The delete and the roles list both ask this, so the list offers Delete only when
+     * the delete goes through.
+     *
+     * For many roles, pass `$inUse` (from the list's counts) and `$ownRoleIds` (the roles the user has):
+     * only those can lock the user out, so the others skip that check and its queries.
+     *
+     * @param  Collection<int, int|string>|null  $ownRoleIds
+     */
+    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, ?Collection $ownRoleIds = null): ?string
+    {
+        if (self::isProtectedRole($role)) {
+            return __('This role is protected and cannot be deleted.');
+        }
+
+        if ($ownRoleIds === null || $ownRoleIds->contains($role->id)) {
+            $lost = self::locksOut($user, $role, collect());
+
+            if ($lost->isNotEmpty()) {
+                return __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
+                    'permissions' => $lost->implode(', '),
+                ]);
+            }
+        }
+
+        if (! self::deletesInUse() && ($inUse ?? self::roleInUse($role))) {
+            return __('This role is assigned and cannot be deleted. Take it away from everyone first.');
+        }
+
+        return null;
+    }
+
+    /**
+     * Why a permission cannot be deleted, or null when it can (see {@see roleDeleteRefusal()}). For many
+     * permissions, pass the protected names and `$inUse` from the list.
+     *
+     * @param  array<int, string>|null  $protectedNames
+     */
+    public static function permissionDeleteRefusal(PermissionContract $permission, ?array $protectedNames = null, ?bool $inUse = null): ?string
+    {
+        if (in_array($permission->name, $protectedNames ?? self::protectedPermissionNames(), true)) {
+            return __('This permission is protected and cannot be deleted.');
+        }
+
+        if (! self::deletesInUse() && ($inUse ?? self::permissionInUse($permission))) {
+            return __('This permission is in use and cannot be deleted. Take it away from every role and user first.');
+        }
+
+        return null;
+    }
+
+    /**
      * Whether a role or a permission that is in use may be deleted (`allow_delete_in_use`).
      */
     public static function deletesInUse(): bool

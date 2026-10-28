@@ -113,7 +113,7 @@ const destroy = () => {
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         {{ role.users_count }}
-                        <span v-if="role.others_count" class="text-xs text-gray-400">· {{ t(':count others', { count: role.others_count }) }}</span>
+                        <span v-if="role.others_count" class="text-xs text-gray-400">· {{ t(role.others_count === 1 ? ':count other' : ':count others', { count: role.others_count }) }}</span>
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">

@@ -27,10 +27,26 @@ class RoleList extends ServerList
 
     private bool $mayManage = false;
 
+    /**
+     * The roles the user has, the only ones whose delete could lock them out. Read only when a role in
+     * use may be deleted: otherwise the user's own roles are in use, and that refuses the delete first.
+     *
+     * @var Collection<int, int|string>
+     */
+    private Collection $ownRoleIds;
+
+    /** The guard's user model as stored in the pivot; false until worked out. */
+    private string|false|null $userType = false;
+
     protected function prepare(Request $request): void
     {
-        $this->held = EscalationGuard::held($request->user());
-        $this->mayManage = Authorizer::allows($request->user(), 'roles', Authorizer::MANAGE);
+        $user = $request->user();
+
+        $this->held = EscalationGuard::held($user);
+        $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
+        $this->ownRoleIds = EscalationGuard::deletesInUse() && $user instanceof Model && method_exists($user, 'roles')
+            ? $user->roles()->pluck($user->roles()->getRelated()->getQualifiedKeyName())
+            : collect();
     }
 
     protected function table(Request $request): DataTable
@@ -54,8 +70,6 @@ class RoleList extends ServerList
             ->select("{$model->getTable()}.*")
             ->selectSub($this->usersCount($key), 'users_count')
             ->selectSub($this->othersCount($key), 'others_count')
-            // Every assignment, as EscalationGuard::roleInUse() counts them for a delete.
-            ->selectSub($this->assignments($key), 'assignments_count')
             ->with('permissions:id,name');
     }
 
@@ -110,16 +124,18 @@ class RoleList extends ServerList
 
     private function userMorphClass(): ?string
     {
-        $userModel = Guard::getModelForGuard(Models::guard());
+        if ($this->userType === false) {
+            $userModel = Guard::getModelForGuard(Models::guard());
+            $this->userType = is_string($userModel) && is_a($userModel, Model::class, true) ? (new $userModel)->getMorphClass() : null;
+        }
 
-        return is_string($userModel) && is_a($userModel, Model::class, true) ? (new $userModel)->getMorphClass() : null;
+        return $this->userType;
     }
 
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Role $model */
         $user = $request->user();
-        $isProtected = EscalationGuard::isProtectedRole($model);
         // Whether the user may open, edit and delete it: the manage permission, and the role not beyond them.
         $canManage = $this->mayManage
             && ! Models::sharedAcrossTeams($model)
@@ -131,12 +147,18 @@ class RoleList extends ServerList
             'users_count'  => (int) $model->getAttribute('users_count'),
             'others_count' => (int) $model->getAttribute('others_count'),
             'permissions'  => $model->permissions->pluck('name')->values()->all(),
-            'is_protected' => $isProtected,
+            'is_protected' => EscalationGuard::isProtectedRole($model),
             'can_manage'   => $canManage,
             // What RoleController::destroy() lets through, so the list offers no Delete that ends in an error.
-            'can_delete'   => $canManage
-                && ! $isProtected
-                && (EscalationGuard::deletesInUse() || (int) $model->getAttribute('assignments_count') === 0),
+            // Users and others together are every assignment, as EscalationGuard::roleInUse() counts
+            // them. (Inside a team they are the team's; a role with assignments in other teams is a
+            // global one, read-only there anyway.)
+            'can_delete'   => $canManage && EscalationGuard::roleDeleteRefusal(
+                $user,
+                $model,
+                (int) $model->getAttribute('users_count') + (int) $model->getAttribute('others_count') > 0,
+                $this->ownRoleIds,
+            ) === null,
         ];
     }
 }

@@ -92,7 +92,7 @@ class PermissionList extends ServerList
             'can_manage'   => $canManage,
             // What PermissionController::destroy() lets through, so the list offers no Delete that ends in
             // an error.
-            'can_delete'   => $canManage && ! $isProtected && (EscalationGuard::deletesInUse() || ! $inUse),
+            'can_delete'   => $canManage && EscalationGuard::permissionDeleteRefusal($model, $this->protected, $inUse) === null,
         ];
     }
 }

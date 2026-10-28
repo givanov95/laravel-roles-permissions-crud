@@ -92,14 +92,10 @@ class PermissionController extends Controller
     {
         abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
 
-        if ($this->isProtected($permission)) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is protected and cannot be deleted.')]);
+        $refusal = EscalationGuard::permissionDeleteRefusal($permission);
 
-            return $this->redirectToIndex('permissions');
-        }
-
-        if (! EscalationGuard::deletesInUse() && EscalationGuard::permissionInUse($permission)) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is in use and cannot be deleted. Take it away from every role and user first.')]);
+        if ($refusal !== null) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $refusal]);
 
             return $this->redirectToIndex('permissions');
         }

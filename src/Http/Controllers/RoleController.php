@@ -114,24 +114,10 @@ class RoleController extends Controller
     {
         abort_unless(EscalationGuard::canManageRole(request()->user(), $role), 403);
 
-        if (EscalationGuard::isProtectedRole($role)) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is protected and cannot be deleted.')]);
+        $refusal = EscalationGuard::roleDeleteRefusal(request()->user(), $role);
 
-            return $this->redirectToIndex('roles');
-        }
-
-        $lost = EscalationGuard::locksOut(request()->user(), $role, collect());
-
-        if ($lost->isNotEmpty()) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
-                'permissions' => $lost->implode(', '),
-            ])]);
-
-            return $this->redirectToIndex('roles');
-        }
-
-        if (! EscalationGuard::deletesInUse() && EscalationGuard::roleInUse($role)) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is assigned and cannot be deleted. Take it away from everyone first.')]);
+        if ($refusal !== null) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $refusal]);
 
             return $this->redirectToIndex('roles');
         }
