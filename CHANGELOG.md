@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v7.1.1
 
 ### Fixed
 - **The lists offer Delete only when a delete would go through.** A role given only to other models
