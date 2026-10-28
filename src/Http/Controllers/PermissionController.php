@@ -65,13 +65,18 @@ class PermissionController extends Controller
 
     public function edit(Permission $permission): Response
     {
-        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
+        $inUse = EscalationGuard::permissionInUse($permission);
+
+        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission, null, $inUse), 403);
 
         return $this->render('permissions/Edit', [
             'permission' => [
                 'id'           => $permission->id,
                 'name'         => $permission->name,
                 'is_protected' => $this->isProtected($permission),
+                // A rename hands the new name to everyone who has the permission, so one in use is renamed
+                // only by a user who may use every permission; the form locks the name for the rest.
+                'can_rename'   => EscalationGuard::canRenamePermissionAtAll(request()->user(), $permission, $inUse),
             ],
         ]);
     }

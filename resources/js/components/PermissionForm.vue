@@ -10,7 +10,8 @@ import SecondaryButton from "./ui/SecondaryButton.vue";
 import TextInput from "./ui/TextInput.vue";
 
 const props = defineProps<{
-    permission?: { id: number; name: string; is_protected: boolean };
+    /** `can_rename` is missing from an older server: the name is then editable as before. */
+    permission?: { id: number; name: string; is_protected: boolean; can_rename?: boolean };
 }>();
 
 const isEdit = computed(() => !!props.permission);
@@ -38,12 +39,15 @@ const submit = () => {
                 v-model="form.name"
                 type="text"
                 class="mt-1 block w-full"
-                :disabled="permission?.is_protected ?? false"
+                :disabled="(permission?.is_protected ?? false) || permission?.can_rename === false"
                 required
                 :autofocus="!isEdit"
             />
             <p v-if="permission?.is_protected" class="mt-1 text-xs text-gray-500">
                 {{ t('This permission is protected; its name cannot be changed.') }}
+            </p>
+            <p v-else-if="permission?.can_rename === false" class="mt-1 text-xs text-gray-500">
+                {{ t('This permission is in use, so it can be renamed only to a permission you hold yourself; a new name needs access to every permission.') }}
             </p>
             <InputError :message="form.errors.name" class="mt-1" />
         </div>
