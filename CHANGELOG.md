@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **The permission form says before a save when the name cannot change.** A permission in use can be
+  renamed only to a name the user can use (since v6.3.0), which in practice means a user who may use
+  every permission (`Gate::before`, the `*` wildcard). The form let anyone edit the name and refused
+  it on save. `edit` now sends `can_rename`, and the form locks the name with the reason.
+
 ## v7.1.1
 
 ### Fixed

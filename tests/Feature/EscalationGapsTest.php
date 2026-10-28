@@ -212,4 +212,34 @@ class EscalationGapsTest extends DefaultsTestCase
             ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$secret->id]])
             ->assertSessionHasErrors(['permissions' => 'The selected permission is invalid.']);
     }
+
+    // ---------------------------------------------------------------- the form knows before a save
+
+    public function test_the_form_locks_the_name_of_a_permission_in_use_for_a_user_who_cannot_rename_it(): void
+    {
+        $this->role('editor', ['view-posts']);
+        $inUse = Permission::findByName('view-posts');
+        // Nobody has it, so it is the manager's to rename.
+        $unused = Permission::findOrCreate('export-posts', 'web');
+        $manager = $this->permissionManager('view-posts');
+
+        $this->actingAs($manager)->getJson(route('admin.permissions.edit', $inUse), $this->inertia())
+            ->assertJsonPath('props.permission.can_rename', false);
+        $this->actingAs($manager)->getJson(route('admin.permissions.edit', $unused), $this->inertia())
+            ->assertJsonPath('props.permission.can_rename', true);
+    }
+
+    public function test_a_super_admin_may_rename_a_permission_in_use_and_the_form_says_so(): void
+    {
+        $this->role('editor', ['view-posts']);
+        $permission = Permission::findByName('view-posts');
+        $super = $this->permissionManager();
+        Gate::before(fn ($user) => $user->is($super) ? true : null);
+
+        $this->actingAs($super)->getJson(route('admin.permissions.edit', $permission), $this->inertia())
+            ->assertJsonPath('props.permission.can_rename', true);
+        $this->actingAs($super)->put(route('admin.permissions.update', $permission), ['name' => 'read-posts'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('read-posts', $permission->fresh()->name);
+    }
 }

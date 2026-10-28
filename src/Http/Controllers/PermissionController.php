@@ -72,6 +72,9 @@ class PermissionController extends Controller
                 'id'           => $permission->id,
                 'name'         => $permission->name,
                 'is_protected' => $this->isProtected($permission),
+                // A rename hands the new name to everyone who has the permission, so one in use is renamed
+                // only by a user who may use every permission; the form locks the name for the rest.
+                'can_rename'   => EscalationGuard::canRenamePermissionAtAll(request()->user(), $permission),
             ],
         ]);
     }

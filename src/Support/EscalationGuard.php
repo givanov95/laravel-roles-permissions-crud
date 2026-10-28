@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
 
@@ -93,6 +94,19 @@ final class EscalationGuard
             || $name === $permission->name
             || ! self::permissionInUse($permission)
             || ($user instanceof Authorizable && $user->can($name));
+    }
+
+    /**
+     * Whether the user could rename the permission to any free name, so the form knows before a save
+     * whether to offer the field. A free name is a permission that does not exist yet, which only a user
+     * who may use every permission (a `Gate::before` super admin, spatie's `*` wildcard) can use; it is
+     * asked with a name no permission has.
+     */
+    public static function canRenamePermissionAtAll(mixed $user, PermissionContract $permission): bool
+    {
+        return ! self::enabled()
+            || ! self::permissionInUse($permission)
+            || ($user instanceof Authorizable && $user->can('roles-permissions-crud.no-such-permission.'.Str::random(16)));
     }
 
     /**
