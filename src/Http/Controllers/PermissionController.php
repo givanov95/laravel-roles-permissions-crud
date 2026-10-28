@@ -14,6 +14,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
@@ -30,11 +31,11 @@ class PermissionController extends Controller
         $protected = EscalationGuard::protectedPermissionNames();
 
         return Inertia::render($this->page('permissions/Index'), [
-            'permissions' => Models::permissionClass()::query()
+            'permissions' => Models::permissions()
                 ->withCount('roles')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (Permission $permission) => [
+                ->map(fn (PermissionContract $permission) => [
                     'id'           => $permission->id,
                     'name'         => $permission->name,
                     'roles_count'  => $permission->roles_count,
@@ -52,7 +53,7 @@ class PermissionController extends Controller
     {
         DB::transaction(fn () => Models::permissionClass()::create([
             'name'       => $request->validated('name'),
-            'guard_name' => config('roles-permissions-crud.guard', 'web'),
+            'guard_name' => Models::guard(),
         ]));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been created.')]);

@@ -94,7 +94,7 @@ What an application gets without configuring anything:
 - **Nobody can hand out more than they hold** (`prevent_privilege_escalation`, on by default). A permission can be added to a role only by a user who holds it; a role can be opened for editing, edited or deleted only by a user who holds every permission it carries; the forms offer only the permissions the user holds, and the roles list says which roles are theirs to change (`can_manage`). A user counts as holding what they can do, so a super admin let through by `Gate::before` holds everything.
 - `protected_roles` (empty by default; list the roles your application's access depends on, e.g. `['Administrator']`) cannot be renamed or deleted and, while escalation is prevented, cannot lose permissions.
 - `protected_permissions` (empty by default) lists permissions that cannot be renamed or deleted. The ones named in `authorize_permissions` are always protected, because deleting one would lock out whoever manages access, and so, while escalation is prevented, are the permissions a protected role holds. Add the permissions your own routes check.
-- A permission given to a role must exist for the configured `guard`; one from another guard is a validation error.
+- The screens list and change only the roles and permissions of the configured `guard`. One of another guard is a 404 on edit, update and delete, a name only has to be unique within the guard, and a permission given to a role must exist for the guard (one from another guard is a validation error).
 
 ## Frontend wiring
 

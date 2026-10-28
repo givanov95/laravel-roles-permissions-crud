@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -31,6 +32,37 @@ final class Models
     {
         /** @var class-string<Permission> */
         return app(PermissionRegistrar::class)->getPermissionClass();
+    }
+
+    /**
+     * The guard whose roles and permissions this package lists and changes (`roles-permissions-crud.guard`).
+     * Left empty, it is the application's default guard, as spatie does for a model without a guard name.
+     */
+    public static function guard(): string
+    {
+        $guard = config('roles-permissions-crud.guard');
+
+        return is_string($guard) && $guard !== '' ? $guard : (string) config('auth.defaults.guard', 'web');
+    }
+
+    /**
+     * The roles of the package's guard: every query that lists or looks up roles starts here.
+     *
+     * @return Builder<Role>
+     */
+    public static function roles(): Builder
+    {
+        return self::roleClass()::query()->where('guard_name', self::guard());
+    }
+
+    /**
+     * The permissions of the package's guard (see {@see roles()}).
+     *
+     * @return Builder<Permission>
+     */
+    public static function permissions(): Builder
+    {
+        return self::permissionClass()::query()->where('guard_name', self::guard());
     }
 
     /**
