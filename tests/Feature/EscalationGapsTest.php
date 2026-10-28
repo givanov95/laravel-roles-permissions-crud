@@ -242,4 +242,19 @@ class EscalationGapsTest extends DefaultsTestCase
             ->assertSessionHasNoErrors();
         $this->assertSame('read-posts', $permission->fresh()->name);
     }
+
+    public function test_with_wildcards_the_form_leaves_the_name_to_the_save(): void
+    {
+        // posts.* covers posts.read, a name no permission has yet: the form cannot know in advance.
+        config(['permission.enable_wildcard_permission' => true]);
+        $this->role('editor', ['posts.view']);
+        $permission = Permission::findByName('posts.view');
+        $manager = $this->permissionManager('posts.*');
+
+        $this->actingAs($manager)->getJson(route('admin.permissions.edit', $permission), $this->inertia())
+            ->assertJsonPath('props.permission.can_rename', true);
+        $this->actingAs($manager)->put(route('admin.permissions.update', $permission), ['name' => 'posts.read'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('posts.read', $permission->fresh()->name);
+    }
 }

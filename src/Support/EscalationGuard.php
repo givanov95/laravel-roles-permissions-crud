@@ -8,7 +8,6 @@ use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
 
@@ -20,6 +19,9 @@ use Spatie\Permission\Contracts\Role as RoleContract;
  */
 final class EscalationGuard
 {
+    /** A permission name that does not exist, for {@see canRenamePermissionAtAll()}. */
+    private const NO_SUCH_PERMISSION = 'roles-permissions-crud: no such permission';
+
     public static function enabled(): bool
     {
         return (bool) config('roles-permissions-crud.prevent_privilege_escalation', true);
@@ -97,16 +99,19 @@ final class EscalationGuard
     }
 
     /**
-     * Whether the user could rename the permission to any free name, so the form knows before a save
-     * whether to offer the field. A free name is a permission that does not exist yet, which only a user
-     * who may use every permission (a `Gate::before` super admin, spatie's `*` wildcard) can use; it is
-     * asked with a name no permission has.
+     * False only when the user certainly cannot rename the permission ({@see canRenamePermission()}), so
+     * the form locks the name instead of refusing it on save. A new name is a permission that does not
+     * exist yet: without wildcards, only a user who may use every permission (a `Gate::before` super
+     * admin) can use one, which is asked with a name no permission has. With spatie's wildcards a user
+     * may hold names that do not exist (`posts.*` covers `posts.read`), so the form cannot tell in
+     * advance and the save decides.
      */
-    public static function canRenamePermissionAtAll(mixed $user, PermissionContract $permission): bool
+    public static function canRenamePermissionAtAll(mixed $user, PermissionContract $permission, ?bool $inUse = null): bool
     {
         return ! self::enabled()
-            || ! self::permissionInUse($permission)
-            || ($user instanceof Authorizable && $user->can('roles-permissions-crud.no-such-permission.'.Str::random(16)));
+            || ! ($inUse ?? self::permissionInUse($permission))
+            || (bool) config('permission.enable_wildcard_permission', false)
+            || ($user instanceof Authorizable && $user->can(self::NO_SUCH_PERMISSION));
     }
 
     /**
