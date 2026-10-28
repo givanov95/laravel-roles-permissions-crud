@@ -5,6 +5,7 @@ import { Link, router, useForm } from "@inertiajs/vue3";
 import { ref } from "vue";
 
 import { r, t } from "../config";
+import { useServerPage } from "../page";
 import ListFooter from "./ui/ListFooter.vue";
 import SortableHeader from "./ui/SortableHeader.vue";
 import ConfirmationModal from "./ui/ConfirmationModal.vue";
@@ -17,6 +18,8 @@ interface Permission {
     name: string;
     roles_count: number;
     is_protected: boolean;
+    /** Whether the user may open, edit and delete it. */
+    can_manage: boolean;
 }
 
 const props = defineProps<{
@@ -25,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const table = useLaravelDataTable<Permission>(() => props.dataTable);
+const { canCreate } = useServerPage();
 
 const showDeleteModal = ref(false);
 const deleteForm = useForm<{ id: number | null; name: string }>({ id: null, name: "" });
@@ -52,7 +56,7 @@ const destroy = () => {
     <div class="rounded-lg bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
             <h2 class="text-base font-medium text-gray-900">{{ t('Manage permissions') }}</h2>
-            <Link :href="(r('permissions.create') as string)">
+            <Link v-if="canCreate" :href="(r('permissions.create') as string)">
                 <PrimaryButton type="button">{{ t('Add permission') }}</PrimaryButton>
             </Link>
         </div>
@@ -92,13 +96,14 @@ const destroy = () => {
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
                             <Link
+                                v-if="permission.can_manage"
                                 :href="(r('permissions.edit', permission.id) as string)"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm hover:bg-gray-50"
                             >
                                 {{ t('Edit') }}
                             </Link>
                             <button
-                                v-if="!permission.is_protected"
+                                v-if="!permission.is_protected && permission.can_manage"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(permission)"

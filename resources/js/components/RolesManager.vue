@@ -5,6 +5,7 @@ import { Link, router, useForm } from "@inertiajs/vue3";
 import { ref } from "vue";
 
 import { r, t } from "../config";
+import { useServerPage } from "../page";
 import ListFooter from "./ui/ListFooter.vue";
 import SortableHeader from "./ui/SortableHeader.vue";
 import ConfirmationModal from "./ui/ConfirmationModal.vue";
@@ -27,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const table = useLaravelDataTable<Role>(() => props.dataTable);
+const { canCreate } = useServerPage();
 
 const showDeleteModal = ref(false);
 const deleteForm = useForm<{ id: number | null; name: string }>({ id: null, name: "" });
@@ -54,7 +56,7 @@ const destroy = () => {
     <div class="rounded-lg bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
             <h2 class="text-base font-medium text-gray-900">{{ t('Manage roles') }}</h2>
-            <Link :href="(r('roles.create') as string)">
+            <Link v-if="canCreate" :href="(r('roles.create') as string)">
                 <PrimaryButton type="button">{{ t('Add role') }}</PrimaryButton>
             </Link>
         </div>

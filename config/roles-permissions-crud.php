@@ -124,7 +124,8 @@ return [
     | Inertia page prefix
     |--------------------------------------------------------------------------
     |
-    | The controllers render "{page_prefix}/roles/Index", etc. Your app must
+    | The controllers render "{page_prefix}/roles/Index", etc. (with the
+    | default, "admin/roles/Index"; the names are case-sensitive). Your app must
     | expose matching thin page shells (which wrap the package components in
     | your own layout) at resources/js/pages/{page_prefix}/...
     |

@@ -17,12 +17,17 @@ trait ChecksPermissionGrants
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $role = $this->route('role');
+            $role = $role instanceof Role ? $role : null;
+
+            // A protected role keeps its name; say so instead of saving the rest and dropping the name.
+            if ($role !== null && EscalationGuard::isProtectedRole($role) && $this->input('name') !== $role->name) {
+                $validator->errors()->add('name', __('This role is protected; its name cannot be changed.'));
+            }
+
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
-
-            $role = $this->route('role');
-            $role = $role instanceof Role ? $role : null;
             $requested = collect((array) $this->input('permissions', []))->map(fn (mixed $id) => (int) $id);
 
             $unknown = $requested->diff(Models::permissions()->whereIn('id', $requested)->pluck('id'));

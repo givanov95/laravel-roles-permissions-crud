@@ -36,11 +36,24 @@ final class EscalationGuard
             return collect();
         }
 
-        return Models::permissions()
+        // Once per request and user: a form request and its controller both ask, and each answer is a
+        // query plus a gate check for every permission.
+        $request = app('request');
+        $key = 'roles-permissions-crud.held.'.($user instanceof Model ? $user->getMorphClass().':'.$user->getKey() : spl_object_id($user));
+
+        if ($request->attributes->has($key)) {
+            return $request->attributes->get($key);
+        }
+
+        $held = Models::permissions()
             ->get(['id', 'name'])
             ->filter(fn (PermissionContract $permission) => $user->can($permission->name))
             ->pluck('id')
             ->values();
+
+        $request->attributes->set($key, $held);
+
+        return $held;
     }
 
     /**

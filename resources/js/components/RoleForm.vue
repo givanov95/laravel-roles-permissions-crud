@@ -3,6 +3,7 @@ import { Link, useForm } from "@inertiajs/vue3";
 import { computed } from "vue";
 
 import { r, t } from "../config";
+import { useServerPage } from "../page";
 import InputError from "./ui/InputError.vue";
 import InputLabel from "./ui/InputLabel.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
@@ -20,6 +21,8 @@ const props = defineProps<{
     role?: RoleData;
     permissions: { value: number; label: string }[];
 }>();
+
+useServerPage();
 
 const isEdit = computed(() => !!props.role);
 

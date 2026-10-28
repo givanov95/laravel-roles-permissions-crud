@@ -20,6 +20,21 @@
   `protected`, so a subclass can use them.
 - After a delete, the list opens where the user left it (page, search, sort).
 - Without a translator, `t()` fills in `:name` placeholders.
+- The lists send `can.create`, and permission rows `can_manage` (roles already had it). Role and
+  permission rows count the `manage-*` permission in `can_manage`, so a user who may only look sees no
+  Add, Edit or Delete buttons that end in a 403.
+- Every page sends `routeNamePrefix` (`route_name_prefix`), and the components use it to resolve
+  routes, so the JS `routeNamePrefix` option can no longer drift from the PHP config.
+  `useServerPage()` is exported for an application's own components.
+
+### Changed
+- Renaming a protected role or permission is a validation error on `name`. Before, the new name was
+  dropped and the toast still said "updated".
+- What the user holds (`EscalationGuard::held()`) is worked out once per request.
+
+### Fixed
+- The README named the pages `Admin/Roles/Index`; they are `{page_prefix}/roles/Index`
+  (`admin/roles/Index` by default).
 
 ### Migrating from 6.x
 1. `composer require givanov95/laravel-roles-permissions-crud:^7.0` and

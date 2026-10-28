@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Lists;
 
 use Givanov95\DataTable\DataTable;
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,9 +21,12 @@ class PermissionList extends ServerList
     /** @var array<int, string> */
     private array $protected = [];
 
+    private bool $mayManage = false;
+
     protected function prepare(Request $request): void
     {
         $this->protected = EscalationGuard::protectedPermissionNames();
+        $this->mayManage = Authorizer::allows($request->user(), 'permissions', Authorizer::MANAGE);
     }
 
     protected function table(Request $request): DataTable
@@ -48,6 +52,9 @@ class PermissionList extends ServerList
             'name'         => $model->name,
             'roles_count'  => (int) $model->getAttribute('roles_count'),
             'is_protected' => in_array($model->name, $this->protected, true),
+            // Whether the user may open, edit and delete it: the manage permission, and the permission
+            // not reaching roles or users beyond them.
+            'can_manage'   => $this->mayManage && EscalationGuard::canManagePermission($request->user(), $model),
         ];
     }
 }
