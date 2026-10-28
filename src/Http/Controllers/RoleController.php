@@ -7,15 +7,16 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
+use Givanov95\RolesPermissionsCrud\Lists\RoleList;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
-use Spatie\Permission\Contracts\Role as RoleContract;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -27,36 +28,14 @@ class RoleController extends Controller
         $this->middleware(self::crudAccess('roles'));
     }
 
-    public function index(): Response
+    /**
+     * The roles, paged, searched and sorted on the server. Bind your own {@see RoleList} to change the
+     * query, the columns or the rows.
+     */
+    public function index(Request $request, RoleList $list): Response
     {
-        // Count assignments via the pivot directly. Spatie's Role::users()
-        // relation resolves the related model from the *active* auth guard,
-        // which during a request may be a token guard (no matching model) and
-        // would blow up withCount(). Reading the pivot is guard-independent.
-        [$pivotTable, $roleKey] = Models::rolePivot();
-
-        $userCounts = DB::table($pivotTable)
-            ->select($roleKey)
-            ->selectRaw('COUNT(*) as aggregate')
-            ->groupBy($roleKey)
-            ->pluck('aggregate', $roleKey);
-
-        $user = request()->user();
-        $held = EscalationGuard::held($user);
-
         return Inertia::render($this->page('roles/Index'), [
-            'roles' => Models::roles()
-                ->with('permissions:id,name')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (RoleContract $role) => [
-                    'id'           => $role->id,
-                    'name'         => $role->name,
-                    'users_count'  => (int) ($userCounts[$role->id] ?? 0),
-                    'permissions'  => $role->permissions->pluck('name'),
-                    'is_protected' => EscalationGuard::isProtectedRole($role),
-                    'can_manage'   => EscalationGuard::canManageRole($user, $role, $held),
-                ]),
+            'dataTable' => $list->payload($request),
         ]);
     }
 
@@ -163,7 +142,7 @@ class RoleController extends Controller
      *
      * @return array<int, array{value: int, label: string}>
      */
-    private function permissionOptions(?Role $role = null): array
+    protected function permissionOptions(?Role $role = null): array
     {
         $held = EscalationGuard::held(request()->user());
         $own = $role?->permissions->pluck('id') ?? collect();
@@ -180,14 +159,14 @@ class RoleController extends Controller
             ->all();
     }
 
-    private function page(string $path): string
+    protected function page(string $path): string
     {
         $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
 
         return $prefix === '' ? $path : $prefix.'/'.$path;
     }
 
-    private function routeName(string $name): string
+    protected function routeName(string $name): string
     {
         return config('roles-permissions-crud.route_name_prefix', 'admin.').$name;
     }

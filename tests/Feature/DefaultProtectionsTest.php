@@ -205,7 +205,7 @@ class DefaultProtectionsTest extends DefaultsTestCase
         $plain = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
         $user = $this->userWith(['view-permissions', 'manage-permissions']);
 
-        $flags = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk()->json('props.permissions'))
+        $flags = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk()->json('props.dataTable.data'))
             ->mapWithKeys(fn (array $permission) => [$permission['name'] => $permission['is_protected']])
             ->all();
 

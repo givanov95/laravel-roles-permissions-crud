@@ -7,14 +7,15 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StorePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdatePermissionRequest;
+use Givanov95\RolesPermissionsCrud\Lists\PermissionList;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
@@ -26,21 +27,14 @@ class PermissionController extends Controller
         $this->middleware(self::crudAccess('permissions'));
     }
 
-    public function index(): Response
+    /**
+     * The permissions, paged, searched and sorted on the server. Bind your own {@see PermissionList} to
+     * change the query, the columns or the rows.
+     */
+    public function index(Request $request, PermissionList $list): Response
     {
-        $protected = EscalationGuard::protectedPermissionNames();
-
         return Inertia::render($this->page('permissions/Index'), [
-            'permissions' => Models::permissions()
-                ->withCount('roles')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (PermissionContract $permission) => [
-                    'id'           => $permission->id,
-                    'name'         => $permission->name,
-                    'roles_count'  => $permission->roles_count,
-                    'is_protected' => in_array($permission->name, $protected, true),
-                ]),
+            'dataTable' => $list->payload($request),
         ]);
     }
 
@@ -109,19 +103,19 @@ class PermissionController extends Controller
         return redirect()->route($this->routeName('permissions.index'));
     }
 
-    private function isProtected(Permission $permission): bool
+    protected function isProtected(Permission $permission): bool
     {
         return in_array($permission->name, EscalationGuard::protectedPermissionNames(), true);
     }
 
-    private function page(string $path): string
+    protected function page(string $path): string
     {
         $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
 
         return $prefix === '' ? $path : $prefix.'/'.$path;
     }
 
-    private function routeName(string $name): string
+    protected function routeName(string $name): string
     {
         return config('roles-permissions-crud.route_name_prefix', 'admin.').$name;
     }

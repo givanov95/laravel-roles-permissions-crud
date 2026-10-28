@@ -21,8 +21,10 @@
         "LICENSE"
     ],
     "peerDependencies": {
+        "@givanov95/vue-data-table": "^4.1.0",
         "@inertiajs/vue3": "^3.0.0",
-        "vue": "^3.2.0"
+        "@tanstack/vue-table": "^9.2.0",
+        "vue": "^3.3.0"
     },
     "keywords": [
         "vue",

@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+- **The lists are paged, searched and sorted on the server**, with
+  [givanov95/laravel-data-table](https://github.com/givanov95/laravel-data-table) ^4.1. `index()` sends
+  one `dataTable` prop (`DataTable::toArray()`) instead of `roles` / `permissions` with every record.
+  The rows keep their fields. Roles are searched by name and sorted by name or users; permissions by
+  name or roles. The page size is `data-table.default_per_page`.
+- `RolesManager` and `PermissionsManager` take `dataTable` instead of `roles` / `permissions`.
+  `@givanov95/vue-data-table` ^4.1 and `@tanstack/vue-table` ^9.2 are new peer dependencies.
+- Laravel 11 is no longer supported (laravel-data-table needs ^12).
+- `users_count` counts only the guard's user model, not other models that were given the role.
+
+### Added
+- `Lists\RoleList` and `Lists\PermissionList` hold the query, the columns and the rows of the lists.
+  Bind a subclass to change them, instead of overriding `index()`.
+- `page()`, `routeName()`, `permissionOptions()` and `isProtected()` on the controllers are
+  `protected`, so a subclass can use them.
+
+### Migrating from 6.x
+1. `composer require givanov95/laravel-roles-permissions-crud:^7.0` and
+   `npm install @givanov95/vue-roles-permissions-crud@^7 @givanov95/vue-data-table @tanstack/vue-table`.
+   Add `@givanov95/vue-data-table` to Vite's `ssr.noExternal` next to this package.
+2. In the `roles/Index` and `permissions/Index` page shells, take `dataTable` and pass it on:
+   `<RolesManager :data-table="dataTable" />`, `<PermissionsManager :data-table="dataTable" />`.
+3. If you overrode `index()` to get a server-side list (as domoupravitel and supervision do), remove the
+   override and your list service; bind a `RoleList` / `PermissionList` subclass if you need other
+   columns or fields.
+
 ## v6.3.0
 
 ### Fixed
