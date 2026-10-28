@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **The lists offer Delete only when a delete would go through.** A role given only to other models
+  (not users), or a permission given only straight to users, showed `0` and a Delete button, and the
+  delete then failed because the record was in use, with nothing on the screen saying why. Rows now
+  send `can_delete` (the same checks as the delete), and `others_count` (roles) / `direct_count`
+  (permissions), which the lists show next to the count (`0 · 3 others`, `0 · 2 direct`).
+
 ## v7.1.0
 
 ### Added

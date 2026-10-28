@@ -73,19 +73,26 @@ class PermissionList extends ServerList
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Permission $model */
+        $isProtected = in_array($model->name, $this->protected, true);
+        // As EscalationGuard::permissionInUse() sees it: given to a role or straight to anyone. (Inside a
+        // team the counts are the team's, but there permissions are read-only anyway.)
+        $inUse = (int) $model->getAttribute('roles_count') > 0 || (int) $model->getAttribute('direct_count') > 0;
+        // Whether the user may open, edit and delete it: the manage permission, and the permission not
+        // reaching roles or users beyond them.
+        $canManage = $this->mayManage
+            && ! Models::inTeam()
+            && EscalationGuard::canManagePermission($request->user(), $model, $this->held, $inUse);
+
         return [
             'id'           => $model->getKey(),
             'name'         => $model->name,
             'roles_count'  => (int) $model->getAttribute('roles_count'),
-            'is_protected' => in_array($model->name, $this->protected, true),
-            // Whether the user may open, edit and delete it: the manage permission, and the permission
-            // not reaching roles or users beyond them.
-            'can_manage'   => $this->mayManage && ! Models::inTeam() && EscalationGuard::canManagePermission(
-                $request->user(),
-                $model,
-                $this->held,
-                (int) $model->getAttribute('roles_count') > 0 || (int) $model->getAttribute('direct_count') > 0,
-            ),
+            'direct_count' => (int) $model->getAttribute('direct_count'),
+            'is_protected' => $isProtected,
+            'can_manage'   => $canManage,
+            // What PermissionController::destroy() lets through, so the list offers no Delete that ends in
+            // an error.
+            'can_delete'   => $canManage && EscalationGuard::permissionDeleteRefusal($model, $this->protected, $inUse) === null,
         ];
     }
 }

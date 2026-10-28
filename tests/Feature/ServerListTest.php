@@ -108,9 +108,11 @@ class ServerListTest extends TestCase
             'id'           => $role->id,
             'name'         => 'editor',
             'users_count'  => 0,
+            'others_count' => 0,
             'permissions'  => ['view-posts'],
             'is_protected' => false,
             'can_manage'   => true,
+            'can_delete'   => true,
         ], $this->roles()->json('props.dataTable.data.0'));
     }
 
@@ -145,9 +147,53 @@ class ServerListTest extends TestCase
             'id'           => $common->id,
             'name'         => 'view-common',
             'roles_count'  => 2,
+            'direct_count' => 0,
             'is_protected' => false,
             'can_manage'   => true,
+            'can_delete'   => false,
         ], $response->json('props.dataTable.data.0'));
+    }
+
+    public function test_a_role_held_only_by_other_models_says_so_and_offers_no_delete(): void
+    {
+        // As domoupravitel gives roles to tenants: no users, so the list must say what keeps it in use.
+        $role = Role::create(['name' => 'tenant', 'guard_name' => 'web']);
+        $this->assign($role, 'App\\Models\\Tenant', 2);
+
+        $this->roles()
+            ->assertJsonPath('props.dataTable.data.0.users_count', 0)
+            ->assertJsonPath('props.dataTable.data.0.others_count', 2)
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false);
+
+        // The list matches what a delete does.
+        $this->delete(route('admin.roles.destroy', $role))->assertInertiaFlash('toast.type', 'error');
+
+        config(['roles-permissions-crud.allow_delete_in_use' => true]);
+        $this->roles()->assertJsonPath('props.dataTable.data.0.can_delete', true);
+        $this->delete(route('admin.roles.destroy', $role))->assertInertiaFlash('toast.type', 'success');
+    }
+
+    public function test_a_protected_role_or_permission_offers_no_delete(): void
+    {
+        config(['roles-permissions-crud.protected_roles' => ['admin'], 'roles-permissions-crud.protected_permissions' => ['view-posts']]);
+        Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+
+        $this->roles()->assertJsonPath('props.dataTable.data.0.can_delete', false);
+        $this->permissions()->assertJsonPath('props.dataTable.data.0.can_delete', false);
+    }
+
+    public function test_a_permission_given_only_straight_to_someone_says_so_and_offers_no_delete(): void
+    {
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        DB::table('model_has_permissions')->insert(['permission_id' => $permission->id, 'model_type' => User::class, 'model_id' => 1]);
+        Permission::create(['name' => 'unused', 'guard_name' => 'web']);
+
+        $rows = collect($this->permissions()->json('props.dataTable.data'))->keyBy('name');
+
+        $this->assertSame([0, 1, false], [$rows['view-posts']['roles_count'], $rows['view-posts']['direct_count'], $rows['view-posts']['can_delete']]);
+        $this->assertTrue($rows['unused']['can_delete']);
+        $this->delete(route('admin.permissions.destroy', $permission))->assertInertiaFlash('toast.type', 'error');
     }
 
     public function test_a_delete_goes_back_to_the_list_as_the_user_left_it(): void

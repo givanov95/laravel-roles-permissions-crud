@@ -140,4 +140,21 @@ class PageContractTest extends DefaultsTestCase
 
         $this->assertSame($few, $queries());
     }
+
+    public function test_the_list_offers_no_delete_that_would_lock_the_user_out(): void
+    {
+        config(['roles-permissions-crud.allow_delete_in_use' => true]);
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        Role::create(['name' => 'spare', 'guard_name' => 'web']);
+        $user = $this->userWith()->assignRole($admin);
+
+        $rows = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->json('props.dataTable.data'))
+            ->pluck('can_delete', 'name');
+
+        // Deleting their own admin role would take manage-roles away from them; the delete says so too.
+        $this->assertFalse($rows['admin']);
+        $this->assertTrue($rows['spare']);
+        $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.type', 'error');
+    }
 }
