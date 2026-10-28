@@ -67,7 +67,7 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    Keys: `guard`, `authorize_permissions`, `prevent_privilege_escalation`,
    `protected_roles`, `protected_permissions`, `allow_delete_in_use`, `prefix`, `route_name_prefix`,
    `middleware`, `page_prefix`. Defaults gate the admin area by four permissions
-   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `Admin/Roles/*`):
+   (`/admin/roles`, route names `admin.roles.*`, Inertia pages `admin/roles/*`):
    `view-roles` and `view-permissions` to look, `manage-roles` and
    `manage-permissions` to change. Seed them and grant them to your admin role;
    whoever edits needs both the `view-*` and the `manage-*` permission.
@@ -95,7 +95,7 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    | List        | Search | Sort                   | Row fields                                                                 |
    | ----------- | ------ | ---------------------- | -------------------------------------------------------------------------- |
    | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `permissions`, `is_protected`, `can_manage`   |
-   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `is_protected`                                |
+   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `is_protected`, `can_manage`                  |
 
    They are sorted by name by default, and the page size is `default_per_page` in
    `config/data-table.php`. `users_count` counts only the guard's user model. To change the query,
@@ -108,6 +108,13 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
 
    An application with its own table component can render the `dataTable` prop itself, with
    `useLaravelDataTable()` from `@givanov95/vue-data-table/tanstack`, instead of `RolesManager`.
+
+   Every page also gets the package's own data under one `rolesPermissionsCrud` prop, so it cannot
+   shadow a prop your application shares: `routeNamePrefix` (`route_name_prefix`) and, on the lists,
+   `canCreate` (whether the user may add). `can_manage` on a row says whether the user may open, edit
+   and delete it: the `manage-*` permission and, while escalation is prevented, a record within their
+   reach. The components read these from the page, so the shells do not forward them, and show only
+   the buttons that lead somewhere.
 
 ## Security
 
@@ -135,16 +142,18 @@ What an application gets without configuring anything:
    app.use(RolesPermissionsPlugin, {
        translator: (key, replacements) => (window as any).__(key, replacements),
        route: (...args) => (window as any).route(...args),
-       routeNamePrefix: 'admin.', // must match config('roles-permissions-crud.route_name_prefix')
+       routeNamePrefix: 'admin.', // fallback: every page of the screens sends route_name_prefix itself
    });
    // Optional global $hasRole / $can helpers:
    app.use(RolesPlugin).use(PermissionsPlugin);
    ```
 
-2. Add thin page shells under `resources/js/pages/Admin/`:
+2. Add thin page shells under `resources/js/pages/admin/` (the controllers render
+   `{page_prefix}/roles/Index` and so on, and `page_prefix` is `admin` by default; the names are
+   case-sensitive):
 
    ```vue
-   <!-- Admin/Roles/Index.vue -->
+   <!-- admin/roles/Index.vue -->
    <script setup lang="ts">
    import { RolesManager } from '@givanov95/vue-roles-permissions-crud';
    import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -162,12 +171,12 @@ What an application gets without configuring anything:
 
    | Page                       | Component             | Props                          |
    | -------------------------- | --------------------- | ------------------------------ |
-   | `Admin/Roles/Index`        | `RolesManager`        | `dataTable`                    |
-   | `Admin/Roles/Create`       | `RoleForm`            | `permissions`                  |
-   | `Admin/Roles/Edit`         | `RoleForm`            | `role`, `permissions`          |
-   | `Admin/Permissions/Index`  | `PermissionsManager`  | `dataTable`                    |
-   | `Admin/Permissions/Create` | `PermissionForm`      | —                              |
-   | `Admin/Permissions/Edit`   | `PermissionForm`      | `permission`                   |
+   | `admin/roles/Index`        | `RolesManager`        | `dataTable`                    |
+   | `admin/roles/Create`       | `RoleForm`            | `permissions`                  |
+   | `admin/roles/Edit`         | `RoleForm`            | `role`, `permissions`          |
+   | `admin/permissions/Index`  | `PermissionsManager`  | `dataTable`                    |
+   | `admin/permissions/Create` | `PermissionForm`      | —                              |
+   | `admin/permissions/Edit`   | `PermissionForm`      | `permission`                   |
 
 ## Tests
 

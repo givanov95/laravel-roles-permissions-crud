@@ -146,6 +146,7 @@ class ServerListTest extends TestCase
             'name'         => 'view-common',
             'roles_count'  => 2,
             'is_protected' => false,
+            'can_manage'   => true,
         ], $response->json('props.dataTable.data.0'));
     }
 

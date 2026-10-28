@@ -18,7 +18,16 @@ class UpdatePermissionRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             $permission = $this->route('permission');
 
-            if ($validator->errors()->isNotEmpty() || ! $permission instanceof \Spatie\Permission\Contracts\Permission) {
+            if (! $permission instanceof \Spatie\Permission\Contracts\Permission) {
+                return;
+            }
+
+            // A protected permission keeps its name; say so instead of reporting a save that did nothing.
+            if (! $validator->errors()->has('name') && $this->input('name') !== $permission->name && in_array($permission->name, EscalationGuard::protectedPermissionNames(), true)) {
+                $validator->errors()->add('name', __('This permission is protected; its name cannot be changed.'));
+            }
+
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 

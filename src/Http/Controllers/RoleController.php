@@ -6,9 +6,11 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RedirectsToIndex;
+use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RendersPages;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
 use Givanov95\RolesPermissionsCrud\Lists\RoleList;
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +25,7 @@ class RoleController extends Controller
 {
     use AuthorizesCrudAccess;
     use RedirectsToIndex;
+    use RendersPages;
 
     public function __construct()
     {
@@ -35,14 +38,17 @@ class RoleController extends Controller
      */
     public function index(): Response
     {
-        return Inertia::render($this->page('roles/Index'), [
+        return $this->render('roles/Index', [
             'dataTable' => app(RoleList::class)->payload(request()),
+        ], [
+            // Whether the user may add records; each row says whether it may be edited (`can_manage`).
+            'canCreate' => Authorizer::allows(request()->user(), 'roles', Authorizer::MANAGE),
         ]);
     }
 
     public function create(): Response
     {
-        return Inertia::render($this->page('roles/Create'), [
+        return $this->render('roles/Create', [
             'permissions' => $this->permissionOptions(),
         ]);
     }
@@ -71,7 +77,7 @@ class RoleController extends Controller
     {
         abort_unless(EscalationGuard::canManageRole(request()->user(), $role), 403);
 
-        return Inertia::render($this->page('roles/Edit'), [
+        return $this->render('roles/Edit', [
             'role' => [
                 'id'           => $role->id,
                 'name'         => $role->name,
@@ -158,17 +164,5 @@ class RoleController extends Controller
             ])
             ->values()
             ->all();
-    }
-
-    protected function page(string $path): string
-    {
-        $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
-
-        return $prefix === '' ? $path : $prefix.'/'.$path;
-    }
-
-    protected function routeName(string $name): string
-    {
-        return config('roles-permissions-crud.route_name_prefix', 'admin.').$name;
     }
 }

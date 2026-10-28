@@ -7,6 +7,7 @@ namespace Givanov95\RolesPermissionsCrud;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\PermissionController;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\RoleController;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
+use Givanov95\RolesPermissionsCrud\Support\HeldPermissions;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,6 +19,8 @@ class RolesPermissionsCrudServiceProvider extends ServiceProvider
             __DIR__.'/../config/roles-permissions-crud.php',
             'roles-permissions-crud'
         );
+
+        $this->app->scoped(HeldPermissions::class);
     }
 
     public function boot(): void

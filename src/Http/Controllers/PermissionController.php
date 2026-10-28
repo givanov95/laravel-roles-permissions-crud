@@ -6,9 +6,11 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RedirectsToIndex;
+use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RendersPages;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StorePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdatePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Lists\PermissionList;
+use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +24,7 @@ class PermissionController extends Controller
 {
     use AuthorizesCrudAccess;
     use RedirectsToIndex;
+    use RendersPages;
 
     public function __construct()
     {
@@ -34,14 +37,17 @@ class PermissionController extends Controller
      */
     public function index(): Response
     {
-        return Inertia::render($this->page('permissions/Index'), [
+        return $this->render('permissions/Index', [
             'dataTable' => app(PermissionList::class)->payload(request()),
+        ], [
+            // Whether the user may add records; each row says whether it may be edited (`can_manage`).
+            'canCreate' => Authorizer::allows(request()->user(), 'permissions', Authorizer::MANAGE),
         ]);
     }
 
     public function create(): Response
     {
-        return Inertia::render($this->page('permissions/Create'));
+        return $this->render('permissions/Create');
     }
 
     public function store(StorePermissionRequest $request): RedirectResponse
@@ -60,7 +66,7 @@ class PermissionController extends Controller
     {
         abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
 
-        return Inertia::render($this->page('permissions/Edit'), [
+        return $this->render('permissions/Edit', [
             'permission' => [
                 'id'           => $permission->id,
                 'name'         => $permission->name,
@@ -107,17 +113,5 @@ class PermissionController extends Controller
     protected function isProtected(Permission $permission): bool
     {
         return in_array($permission->name, EscalationGuard::protectedPermissionNames(), true);
-    }
-
-    protected function page(string $path): string
-    {
-        $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
-
-        return $prefix === '' ? $path : $prefix.'/'.$path;
-    }
-
-    protected function routeName(string $name): string
-    {
-        return config('roles-permissions-crud.route_name_prefix', 'admin.').$name;
     }
 }

@@ -126,11 +126,16 @@ class DefaultProtectionsTest extends DefaultsTestCase
         $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
         $user = $this->userWith(['view-roles', 'manage-roles', 'view-posts']);
 
+        // A new name is refused out loud, not dropped while the rest is saved.
         $this->actingAs($user)
             ->put(route('admin.roles.update', $role), ['name' => 'renamed', 'permissions' => [$permission->id]])
-            ->assertRedirect();
-
+            ->assertSessionHasErrors(['name' => 'This role is protected; its name cannot be changed.']);
         $this->assertSame('super-admin', $role->fresh()->name);
+        $this->assertFalse($role->fresh()->hasPermissionTo('view-posts'));
+
+        $this->actingAs($user)
+            ->put(route('admin.roles.update', $role), ['name' => 'super-admin', 'permissions' => [$permission->id]])
+            ->assertSessionHasNoErrors();
         $this->assertTrue($role->fresh()->hasPermissionTo('view-posts'));
     }
 

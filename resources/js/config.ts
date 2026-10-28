@@ -8,6 +8,8 @@
  * global lookup).
  */
 
+import { serverPageData } from "./page";
+
 export type Translator = (key: string, replacements?: Record<string, unknown>) => string;
 
 export type Router = (...args: unknown[]) => unknown;
@@ -72,9 +74,10 @@ export function r(name: string, ...args: unknown[]): unknown {
         return undefined;
     }
 
-    return fn(state.routeNamePrefix + name, ...args);
+    return fn(routeNamePrefix() + name, ...args);
 }
 
+/** The prefix the server sends with the page (`route_name_prefix`), else the configured fallback. */
 export function routeNamePrefix(): string {
-    return state.routeNamePrefix;
+    return serverPageData().routeNamePrefix ?? state.routeNamePrefix;
 }
