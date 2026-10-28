@@ -30,13 +30,13 @@ class GuardScopingTest extends TestCase
 
         $this->getJson(route('admin.roles.index'), ['X-Inertia' => 'true'])
             ->assertOk()
-            ->assertJsonCount(1, 'props.roles')
-            ->assertJsonPath('props.roles.0.name', 'editor');
+            ->assertJsonCount(1, 'props.dataTable.data')
+            ->assertJsonPath('props.dataTable.data.0.name', 'editor');
 
         $this->getJson(route('admin.permissions.index'), ['X-Inertia' => 'true'])
             ->assertOk()
-            ->assertJsonCount(1, 'props.permissions')
-            ->assertJsonPath('props.permissions.0.name', 'view-posts');
+            ->assertJsonCount(1, 'props.dataTable.data')
+            ->assertJsonPath('props.dataTable.data.0.name', 'view-posts');
     }
 
     public function test_a_role_of_another_guard_is_not_found(): void

@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import type { LaravelDataTablePayload } from "@givanov95/vue-data-table/tanstack";
+import { useLaravelDataTable } from "@givanov95/vue-data-table/tanstack";
 import { Link, router, useForm } from "@inertiajs/vue3";
 import { ref } from "vue";
 
 import { r, t } from "../config";
+import ListFooter from "./ui/ListFooter.vue";
+import SortableHeader from "./ui/SortableHeader.vue";
 import ConfirmationModal from "./ui/ConfirmationModal.vue";
 import DangerButton from "./ui/DangerButton.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
@@ -15,9 +19,12 @@ interface Permission {
     is_protected: boolean;
 }
 
-defineProps<{
-    permissions: Permission[];
+const props = defineProps<{
+    /** `PermissionController::index()`: paged, searched and sorted on the server. */
+    dataTable: LaravelDataTablePayload<Permission>;
 }>();
+
+const table = useLaravelDataTable<Permission>(() => props.dataTable);
 
 const showDeleteModal = ref(false);
 const deleteForm = useForm<{ id: number | null; name: string }>({ id: null, name: "" });
@@ -50,16 +57,31 @@ const destroy = () => {
             </Link>
         </div>
 
+        <div class="border-b border-gray-100 px-6 py-3">
+            <input
+                type="search"
+                :value="table.state.globalFilter"
+                :placeholder="t('Search permissions…')"
+                :aria-label="t('Search permissions')"
+                class="block w-full max-w-xs rounded-md border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                @input="table.onGlobalFilterChange(($event.target as HTMLInputElement).value)"
+            />
+        </div>
+
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Name') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Roles') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <SortableHeader column="name" :label="t('Name')" :sorting="table.state.sorting" @sort="table.onSortingChange" />
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <SortableHeader column="roles_count" :label="t('Roles')" :sorting="table.state.sorting" @sort="table.onSortingChange" />
+                    </th>
                     <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Action') }}</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
-                <tr v-for="permission in permissions" :key="permission.id">
+                <tr v-for="permission in table.data" :key="permission.id">
                     <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                         {{ permission.name }}
                         <span v-if="permission.is_protected" class="ms-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
@@ -86,11 +108,13 @@ const destroy = () => {
                         </div>
                     </td>
                 </tr>
-                <tr v-if="!permissions.length">
+                <tr v-if="!table.data.length">
                     <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-400">{{ t('No permissions found.') }}</td>
                 </tr>
             </tbody>
         </table>
+
+        <ListFooter :meta="table.meta" @page="table.goToPage" />
 
         <ConfirmationModal :show="showDeleteModal" @close="closeModal">
             <template #title>{{ t('Delete permission') }}</template>

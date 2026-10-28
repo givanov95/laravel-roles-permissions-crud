@@ -19,8 +19,12 @@ stays local.
 
 ```bash
 composer require givanov95/laravel-roles-permissions-crud
-npm install @givanov95/vue-roles-permissions-crud
+npm install @givanov95/vue-roles-permissions-crud @givanov95/vue-data-table @tanstack/vue-table
 ```
+
+The lists are paged, searched and sorted on the server with
+[givanov95/laravel-data-table](https://github.com/givanov95/laravel-data-table), which composer
+installs; `@givanov95/vue-data-table` and `@tanstack/vue-table` are its frontend side.
 
 ### Local development (path / file: link)
 
@@ -49,7 +53,7 @@ Vite must bundle the package source (it ships `.ts`/`.vue`, not a build):
 
 ```js
 // vite.config.ts — ssr.noExternal
-noExternal: ['@givanov95/vue-roles-permissions-crud']
+noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table']
 ```
 
 ## Backend wiring
@@ -83,6 +87,27 @@ noExternal: ['@givanov95/vue-roles-permissions-crud']
    `models.permission`), so a model that extends spatie's (observers, overridden
    `delete()`, …) sees every change made in these screens. Each write, such as
    creating a role together with its permissions, runs in one database transaction.
+
+4. The lists come from the server. `index()` sends one `dataTable` prop, the payload of
+   laravel-data-table's `DataTable::toArray()`: the rows of the page, `meta` (page, total),
+   `columns` and the applied `state`.
+
+   | List        | Search | Sort                   | Row fields                                                                 |
+   | ----------- | ------ | ---------------------- | -------------------------------------------------------------------------- |
+   | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `permissions`, `is_protected`, `can_manage`   |
+   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `is_protected`                                |
+
+   They are sorted by name by default, and the page size is `default_per_page` in
+   `config/data-table.php`. `users_count` counts only the guard's user model. To change the query,
+   the columns or the rows, extend `Givanov95\RolesPermissionsCrud\Lists\RoleList` (or
+   `PermissionList`) and bind it:
+
+   ```php
+   $this->app->bind(RoleList::class, AppRoleList::class);
+   ```
+
+   An application with its own table component can render the `dataTable` prop itself, with
+   `useLaravelDataTable()` from `@givanov95/vue-data-table/tanstack`, instead of `RolesManager`.
 
 ## Security
 
@@ -123,12 +148,12 @@ What an application gets without configuring anything:
    <script setup lang="ts">
    import { RolesManager } from '@givanov95/vue-roles-permissions-crud';
    import AdminLayout from '@/layouts/AdminLayout.vue';
-   defineProps<{ roles: any[] }>();
+   defineProps<{ dataTable: any }>();
    </script>
    <template>
        <AdminLayout :title="__('Roles')">
            <template #header><h1 class="text-xl font-semibold text-gray-800">{{ __('Roles') }}</h1></template>
-           <RolesManager :roles="roles" />
+           <RolesManager :data-table="dataTable" />
        </AdminLayout>
    </template>
    ```
@@ -137,10 +162,10 @@ What an application gets without configuring anything:
 
    | Page                       | Component             | Props                          |
    | -------------------------- | --------------------- | ------------------------------ |
-   | `Admin/Roles/Index`        | `RolesManager`        | `roles`                        |
+   | `Admin/Roles/Index`        | `RolesManager`        | `dataTable`                    |
    | `Admin/Roles/Create`       | `RoleForm`            | `permissions`                  |
    | `Admin/Roles/Edit`         | `RoleForm`            | `role`, `permissions`          |
-   | `Admin/Permissions/Index`  | `PermissionsManager`  | `permissions`                  |
+   | `Admin/Permissions/Index`  | `PermissionsManager`  | `dataTable`                    |
    | `Admin/Permissions/Create` | `PermissionForm`      | —                              |
    | `Admin/Permissions/Edit`   | `PermissionForm`      | `permission`                   |
 
@@ -151,7 +176,7 @@ composer test      # PHPUnit on Orchestra Testbench
 composer analyse   # PHPStan (Larastan)
 ```
 
-`TestCase` switches the middleware, `authorize_permissions` and `prevent_privilege_escalation` off so the controllers can be tested on their own; `DefaultsTestCase` runs with the package defaults (access control, validation, protected roles, mass assignment, the permission cache). CI runs both commands on PHP 8.3 and 8.4 for every push to `main` and every pull request, and publishing to npm waits for it. It uses the newest Laravel that `composer.json` allows; Laravel 11 and 12 are not tested separately.
+`TestCase` switches the middleware, `authorize_permissions` and `prevent_privilege_escalation` off so the controllers can be tested on their own; `DefaultsTestCase` runs with the package defaults (access control, validation, protected roles, mass assignment, the permission cache). CI runs both commands on PHP 8.3 and 8.4 for every push to `main` and every pull request, and publishing to npm waits for it. It uses the newest Laravel that `composer.json` allows; Laravel 12 is not tested separately.
 
 ## License
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Tests;
 
+use Givanov95\DataTable\DataTableServiceProvider;
 use Givanov95\RolesPermissionsCrud\RolesPermissionsCrudServiceProvider;
 use Illuminate\Routing\Router;
 use Inertia\ServiceProvider as InertiaServiceProvider;
@@ -15,6 +16,7 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             PermissionServiceProvider::class,
+            DataTableServiceProvider::class,
             InertiaServiceProvider::class,
             RolesPermissionsCrudServiceProvider::class,
         ];

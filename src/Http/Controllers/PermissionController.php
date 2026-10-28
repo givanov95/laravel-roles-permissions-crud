@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
+use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RedirectsToIndex;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StorePermissionRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdatePermissionRequest;
+use Givanov95\RolesPermissionsCrud\Lists\PermissionList;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
@@ -14,33 +16,26 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
 {
     use AuthorizesCrudAccess;
+    use RedirectsToIndex;
 
     public function __construct()
     {
         $this->middleware(self::crudAccess('permissions'));
     }
 
+    /**
+     * The permissions, paged, searched and sorted on the server. Bind your own {@see PermissionList} to
+     * change the query, the columns or the rows.
+     */
     public function index(): Response
     {
-        $protected = EscalationGuard::protectedPermissionNames();
-
         return Inertia::render($this->page('permissions/Index'), [
-            'permissions' => Models::permissions()
-                ->withCount('roles')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (PermissionContract $permission) => [
-                    'id'           => $permission->id,
-                    'name'         => $permission->name,
-                    'roles_count'  => $permission->roles_count,
-                    'is_protected' => in_array($permission->name, $protected, true),
-                ]),
+            'dataTable' => app(PermissionList::class)->payload(request()),
         ]);
     }
 
@@ -93,35 +88,35 @@ class PermissionController extends Controller
         if ($this->isProtected($permission)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is protected and cannot be deleted.')]);
 
-            return redirect()->route($this->routeName('permissions.index'));
+            return $this->redirectToIndex('permissions');
         }
 
         if (! EscalationGuard::deletesInUse() && EscalationGuard::permissionInUse($permission)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This permission is in use and cannot be deleted. Take it away from every role and user first.')]);
 
-            return redirect()->route($this->routeName('permissions.index'));
+            return $this->redirectToIndex('permissions');
         }
 
         DB::transaction(fn () => Models::permission($permission)->delete());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The permission has been deleted.')]);
 
-        return redirect()->route($this->routeName('permissions.index'));
+        return $this->redirectToIndex('permissions');
     }
 
-    private function isProtected(Permission $permission): bool
+    protected function isProtected(Permission $permission): bool
     {
         return in_array($permission->name, EscalationGuard::protectedPermissionNames(), true);
     }
 
-    private function page(string $path): string
+    protected function page(string $path): string
     {
         $prefix = trim((string) config('roles-permissions-crud.page_prefix', 'admin'), '/');
 
         return $prefix === '' ? $path : $prefix.'/'.$path;
     }
 
-    private function routeName(string $name): string
+    protected function routeName(string $name): string
     {
         return config('roles-permissions-crud.route_name_prefix', 'admin.').$name;
     }

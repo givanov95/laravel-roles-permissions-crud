@@ -30,12 +30,12 @@ class ConfiguredGuardTest extends TestCase
         Permission::create(['name' => 'view-audit', 'guard_name' => 'admin']);
 
         $this->getJson(route('admin.roles.index'), ['X-Inertia' => 'true'])
-            ->assertJsonCount(1, 'props.roles')
-            ->assertJsonPath('props.roles.0.name', 'auditor');
+            ->assertJsonCount(1, 'props.dataTable.data')
+            ->assertJsonPath('props.dataTable.data.0.name', 'auditor');
 
         $this->getJson(route('admin.permissions.index'), ['X-Inertia' => 'true'])
-            ->assertJsonCount(1, 'props.permissions')
-            ->assertJsonPath('props.permissions.0.name', 'view-audit');
+            ->assertJsonCount(1, 'props.dataTable.data')
+            ->assertJsonPath('props.dataTable.data.0.name', 'view-audit');
     }
 
     public function test_new_roles_and_permissions_get_the_configured_guard(): void

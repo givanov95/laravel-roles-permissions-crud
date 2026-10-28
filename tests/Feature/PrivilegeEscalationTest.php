@@ -108,7 +108,7 @@ class PrivilegeEscalationTest extends DefaultsTestCase
         $this->role('powerful', ['delete-everything']);
         $user = $this->userWith(['view-roles', 'manage-roles']);
 
-        $flags = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk()->json('props.roles'))
+        $flags = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk()->json('props.dataTable.data'))
             ->mapWithKeys(fn (array $role) => [$role['name'] => $role['can_manage']])
             ->all();
 
@@ -165,7 +165,7 @@ class PrivilegeEscalationTest extends DefaultsTestCase
         $this->assertModelExists($permission);
         $this->assertSame('reports.export', $permission->fresh()->name);
 
-        $flags = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.permissions'))
+        $flags = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
             ->mapWithKeys(fn (array $p) => [$p['name'] => $p['is_protected']])
             ->all();
         $this->assertTrue($flags['reports.export']);

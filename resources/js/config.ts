@@ -55,7 +55,11 @@ export function t(key: string, replacements?: Record<string, unknown>): string {
         return globalT(key, replacements);
     }
 
-    return key;
+    // No translator: the key itself, with its `:name` placeholders filled in (whole names, so `:to`
+    // does not eat the start of `:total`).
+    return key.replace(/:(\w+)/g, (placeholder, name: string) =>
+        replacements && name in replacements ? String(replacements[name]) : placeholder,
+    );
 }
 
 /** Resolve a route. Accepts a bare name ("roles.index") which gets the
