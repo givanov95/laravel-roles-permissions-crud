@@ -7,6 +7,7 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns;
 use Closure;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Spatie\Permission\Contracts\Permission;
 use Spatie\Permission\Contracts\Role;
@@ -36,8 +37,23 @@ trait AuthorizesCrudAccess
             // A role or permission of another guard is not this package's to show or change. Checked
             // here, before the form request, so it is a 404 and not a validation error or a 500.
             // Every bound parameter is looked at, so renamed route parameters are covered too.
+            // The same for a role of another team (spatie teams): the current team's and the global ones
+            // are there, as in the list.
+            //
+            // Inside a team, what other teams share (every permission, the global roles) is read-only:
+            // changing it would change their access too.
+            $manageInTeam = $ability === Authorizer::MANAGE && Models::inTeam();
+            abort_if($manageInTeam && $resource === 'permissions', 403);
+
             foreach ($request->route()?->parameters() ?? [] as $parameter) {
-                abort_if(($parameter instanceof Role || $parameter instanceof Permission) && $parameter->guard_name !== Models::guard(), 404);
+                // Other parameters (a `{team}` of the application's routes, say) are not the package's.
+                if (! $parameter instanceof Model || ! ($parameter instanceof Role || $parameter instanceof Permission)) {
+                    continue;
+                }
+
+                abort_if($parameter->getAttribute('guard_name') !== Models::guard(), 404);
+                abort_if(! Models::visibleInTeam($parameter), 404);
+                abort_if($manageInTeam && Models::sharedAcrossTeams($parameter), 403);
             }
 
             return $next($request);

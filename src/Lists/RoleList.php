@@ -68,6 +68,11 @@ class RoleList extends ServerList
             $query->where("{$pivot}.model_type", (new $userModel)->getMorphClass());
         }
 
+        // Inside a team, the users who have the role in that team.
+        if (Models::inTeam()) {
+            $query->where("{$pivot}.".Models::teamKey(), Models::team());
+        }
+
         return $query;
     }
 
@@ -84,7 +89,9 @@ class RoleList extends ServerList
             'is_protected' => EscalationGuard::isProtectedRole($model),
             // Whether the user may open, edit and delete it: the manage permission, and the role not
             // beyond them.
-            'can_manage'   => $this->mayManage && EscalationGuard::canManageRole($user, $model, $this->held),
+            'can_manage'   => $this->mayManage
+                && ! Models::sharedAcrossTeams($model)
+                && EscalationGuard::canManageRole($user, $model, $this->held),
         ];
     }
 }
