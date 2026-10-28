@@ -6,6 +6,9 @@ namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -46,13 +49,89 @@ final class Models
     }
 
     /**
-     * The roles of the package's guard: every query that lists or looks up roles starts here.
+     * The roles of the package's guard: every query that lists or looks up roles starts here. With spatie
+     * teams, the roles of the current team and the global ones (no team), as spatie looks a role up.
      *
      * @return Builder<Role>
      */
     public static function roles(): Builder
     {
-        return self::roleClass()::query()->where('guard_name', self::guard());
+        $query = self::roleClass()::query()->where('guard_name', self::guard());
+
+        if (self::teams()) {
+            $key = $query->getModel()->qualifyColumn(self::teamKey());
+            $team = self::team();
+
+            $query->where(fn (Builder $query) => $team === null
+                ? $query->whereNull($key)
+                : $query->whereNull($key)->orWhere($key, $team));
+        }
+
+        return $query;
+    }
+
+    /**
+     * The rule that a role name is free: within the guard and, with teams, among the roles of the current
+     * team and the global ones, the ones spatie's Role::create() checks.
+     */
+    public static function uniqueRoleName(): Unique
+    {
+        $rule = Rule::unique(self::roleClass(), 'name')->where('guard_name', self::guard());
+
+        if (self::teams()) {
+            $key = self::teamKey();
+            $team = self::team();
+
+            $rule->where(fn (QueryBuilder $query) => $team === null
+                ? $query->whereNull($key)
+                : $query->where(fn (QueryBuilder $query) => $query->whereNull($key)->orWhere($key, $team)));
+        }
+
+        return $rule;
+    }
+
+    /**
+     * Whether spatie's teams are on (`permission.teams`).
+     */
+    public static function teams(): bool
+    {
+        return (bool) app(PermissionRegistrar::class)->teams;
+    }
+
+    public static function teamKey(): string
+    {
+        return (string) app(PermissionRegistrar::class)->teamsKey;
+    }
+
+    /**
+     * The current team (`getPermissionsTeamId()`), none without teams.
+     */
+    public static function team(): int|string|null
+    {
+        return self::teams() ? app(PermissionRegistrar::class)->getPermissionsTeamId() : null;
+    }
+
+    /**
+     * Whether the screens are used inside a team: teams on and a current team set.
+     */
+    public static function inTeam(): bool
+    {
+        return self::team() !== null;
+    }
+
+    /**
+     * Whether a role or permission is shared with other teams while the screens are used inside a team:
+     * every permission (spatie's permissions have no team) and every global role. Changing one from a
+     * team would change the access of the other teams, so inside a team they are read-only; they are
+     * changed outside any team (no current team), such as in the application's own admin area.
+     */
+    public static function sharedAcrossTeams(Model $record): bool
+    {
+        if (! self::inTeam()) {
+            return false;
+        }
+
+        return ! $record instanceof Role || $record->getAttribute(self::teamKey()) === null;
     }
 
     /**

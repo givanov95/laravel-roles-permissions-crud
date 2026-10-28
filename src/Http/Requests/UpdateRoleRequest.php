@@ -9,7 +9,6 @@ use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateRoleRequest extends FormRequest
 {
@@ -31,7 +30,7 @@ class UpdateRoleRequest extends FormRequest
         $roleId = $this->route('role')?->id;
 
         return [
-            'name'          => ['required', 'string', 'max:255', Rule::unique(Models::roleClass(), 'name')->where('guard_name', Models::guard())->ignore($roleId)],
+            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()->ignore($roleId)],
             'permissions'   => ['array'],
             // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
             'permissions.*' => ['integer'],

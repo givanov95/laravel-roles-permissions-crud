@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Spatie teams** (`permission.teams`). The screens work in the current team (`getPermissionsTeamId()`):
+  - they list the team's roles and the global ones, and a role of another team is a 404;
+  - a role name has to be free among the team's and the global roles, as spatie's `Role::create()` checks;
+  - `users_count` counts the assignments in the team;
+  - inside a team, what every team shares is read-only (403, no `can_manage`, no Add button for
+    permissions): the global roles and all permissions, which have no team in spatie. They are changed
+    outside any team.
+
+  Without teams nothing changes.
+
 ## v7.0.0
 
 ### Breaking

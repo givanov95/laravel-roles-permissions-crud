@@ -41,7 +41,8 @@ class PermissionController extends Controller
             'dataTable' => app(PermissionList::class)->payload(request()),
         ], [
             // Whether the user may add records; each row says whether it may be edited (`can_manage`).
-            'canCreate' => Authorizer::allows(request()->user(), 'permissions', Authorizer::MANAGE),
+            // Permissions are shared by every team, so they are not added from inside one.
+            'canCreate' => Authorizer::allows(request()->user(), 'permissions', Authorizer::MANAGE) && ! Models::inTeam(),
         ]);
     }
 

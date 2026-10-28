@@ -67,7 +67,7 @@ class PermissionList extends ServerList
             'is_protected' => in_array($model->name, $this->protected, true),
             // Whether the user may open, edit and delete it: the manage permission, and the permission
             // not reaching roles or users beyond them.
-            'can_manage'   => $this->mayManage && EscalationGuard::canManagePermission(
+            'can_manage'   => $this->mayManage && ! Models::inTeam() && EscalationGuard::canManagePermission(
                 $request->user(),
                 $model,
                 $this->held,

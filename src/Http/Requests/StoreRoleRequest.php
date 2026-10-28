@@ -9,7 +9,6 @@ use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreRoleRequest extends FormRequest
 {
@@ -27,7 +26,7 @@ class StoreRoleRequest extends FormRequest
     {
 
         return [
-            'name'          => ['required', 'string', 'max:255', Rule::unique(Models::roleClass(), 'name')->where('guard_name', Models::guard())],
+            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()],
             'permissions'   => ['array'],
             // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
             'permissions.*' => ['integer'],

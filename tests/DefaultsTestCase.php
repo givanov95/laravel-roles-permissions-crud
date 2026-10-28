@@ -36,6 +36,10 @@ abstract class DefaultsTestCase extends \Orchestra\Testbench\TestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        // spatie's fix for testing: the roles table always has the team column. Eloquent remembers a
+        // table's columns for the whole process, so without it TeamsTest would see the columns of the
+        // first test that ran.
+        $app['config']->set('permission.testing', true);
         $app['config']->set('auth.providers.users.model', User::class);
     }
 
