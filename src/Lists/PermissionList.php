@@ -11,6 +11,8 @@ use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission;
 
 /**
@@ -23,10 +25,14 @@ class PermissionList extends ServerList
 
     private bool $mayManage = false;
 
+    /** @var Collection<int, int> */
+    private Collection $held;
+
     protected function prepare(Request $request): void
     {
         $this->protected = EscalationGuard::protectedPermissionNames();
         $this->mayManage = Authorizer::allows($request->user(), 'permissions', Authorizer::MANAGE);
+        $this->held = EscalationGuard::held($request->user());
     }
 
     protected function table(Request $request): DataTable
@@ -41,7 +47,14 @@ class PermissionList extends ServerList
      */
     protected function query(): Builder
     {
-        return Models::permissions()->withCount('roles');
+        $permissions = Models::permissions();
+        $key = $permissions->getModel()->getQualifiedKeyName();
+        [$pivot, $permissionKey] = Models::permissionPivot();
+
+        return $permissions
+            ->withCount('roles')
+            // Given straight to users: with the roles, whether the permission is in use.
+            ->addSelect(['direct_count' => DB::table($pivot)->selectRaw('count(*)')->whereColumn("{$pivot}.{$permissionKey}", $key)]);
     }
 
     protected function row(Model $model, Request $request): array
@@ -54,7 +67,12 @@ class PermissionList extends ServerList
             'is_protected' => in_array($model->name, $this->protected, true),
             // Whether the user may open, edit and delete it: the manage permission, and the permission
             // not reaching roles or users beyond them.
-            'can_manage'   => $this->mayManage && EscalationGuard::canManagePermission($request->user(), $model),
+            'can_manage'   => $this->mayManage && EscalationGuard::canManagePermission(
+                $request->user(),
+                $model,
+                $this->held,
+                (int) $model->getAttribute('roles_count') > 0 || (int) $model->getAttribute('direct_count') > 0,
+            ),
         ];
     }
 }

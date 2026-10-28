@@ -109,10 +109,12 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    An application with its own table component can render the `dataTable` prop itself, with
    `useLaravelDataTable()` from `@givanov95/vue-data-table/tanstack`, instead of `RolesManager`.
 
-   Every page also gets `routeNamePrefix` (`route_name_prefix`), and the lists get `can.create`
-   (whether the user may add). `can_manage` on a row says whether the user may open, edit and delete
-   it: the `manage-*` permission and, while escalation is prevented, a record within their reach. The
-   components read both from the page and show only the buttons that lead somewhere.
+   Every page also gets the package's own data under one `rolesPermissionsCrud` prop, so it cannot
+   shadow a prop your application shares: `routeNamePrefix` (`route_name_prefix`) and, on the lists,
+   `canCreate` (whether the user may add). `can_manage` on a row says whether the user may open, edit
+   and delete it: the `manage-*` permission and, while escalation is prevented, a record within their
+   reach. The components read these from the page, so the shells do not forward them, and show only
+   the buttons that lead somewhere.
 
 ## Security
 

@@ -18,8 +18,8 @@ interface Permission {
     name: string;
     roles_count: number;
     is_protected: boolean;
-    /** Whether the user may open, edit and delete it. */
-    can_manage: boolean;
+    /** Whether the user may open, edit and delete it (missing from an older server: allowed). */
+    can_manage?: boolean;
 }
 
 const props = defineProps<{
@@ -96,14 +96,14 @@ const destroy = () => {
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div class="flex justify-end gap-2">
                             <Link
-                                v-if="permission.can_manage"
+                                v-if="permission.can_manage !== false"
                                 :href="(r('permissions.edit', permission.id) as string)"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm hover:bg-gray-50"
                             >
                                 {{ t('Edit') }}
                             </Link>
                             <button
-                                v-if="!permission.is_protected && permission.can_manage"
+                                v-if="!permission.is_protected && permission.can_manage !== false"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
                                 @click="confirmDelete(permission)"

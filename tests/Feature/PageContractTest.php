@@ -34,7 +34,7 @@ class PageContractTest extends DefaultsTestCase
             $this->actingAs($user)->getJson($url, $this->inertia())
                 ->assertOk()
                 ->assertJsonPath('component', $component)
-                ->assertJsonPath('props.routeNamePrefix', 'admin.');
+                ->assertJsonPath('props.rolesPermissionsCrud.routeNamePrefix', 'admin.');
         }
 
         config(['roles-permissions-crud.page_prefix' => 'Backoffice']);
@@ -50,11 +50,11 @@ class PageContractTest extends DefaultsTestCase
         $viewer = $this->userWith(['view-roles', 'view-permissions']);
 
         $this->actingAs($viewer)->getJson(route('admin.roles.index'), $this->inertia())
-            ->assertJsonPath('props.can.create', false)
+            ->assertJsonPath('props.rolesPermissionsCrud.canCreate', false)
             ->assertJsonPath('props.dataTable.data.0.can_manage', false);
 
         $this->actingAs($viewer)->getJson(route('admin.permissions.index'), $this->inertia())
-            ->assertJsonPath('props.can.create', false)
+            ->assertJsonPath('props.rolesPermissionsCrud.canCreate', false)
             ->assertJsonPath('props.dataTable.data.0.can_manage', false);
     }
 
@@ -65,12 +65,12 @@ class PageContractTest extends DefaultsTestCase
         $manager = $this->userWith(['view-roles', 'manage-roles', 'view-permissions', 'manage-permissions']);
 
         $roles = collect($this->actingAs($manager)->getJson(route('admin.roles.index'), $this->inertia())
-            ->assertJsonPath('props.can.create', true)
+            ->assertJsonPath('props.rolesPermissionsCrud.canCreate', true)
             ->json('props.dataTable.data'))->pluck('can_manage', 'name');
         $this->assertFalse($roles['boss']);
 
         $permissions = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())
-            ->assertJsonPath('props.can.create', true)
+            ->assertJsonPath('props.rolesPermissionsCrud.canCreate', true)
             ->json('props.dataTable.data'))->pluck('can_manage', 'name');
         $this->assertFalse($permissions['delete-everything']);
         $this->assertTrue($permissions['view-posts']);
@@ -100,5 +100,44 @@ class PageContractTest extends DefaultsTestCase
 
         $held = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'select "id", "name" from "permissions"'));
         $this->assertCount(1, $held);
+    }
+
+    public function test_what_the_user_holds_is_not_remembered_past_a_queue_job(): void
+    {
+        $user = $this->userWith(['view-roles']);
+        $before = \Givanov95\RolesPermissionsCrud\Support\EscalationGuard::held($user);
+
+        $user->givePermissionTo(Permission::findOrCreate('manage-roles', 'web'));
+        // What a queue worker (and Octane) does between jobs.
+        $this->app->forgetScopedInstances();
+
+        $this->assertCount(count($before) + 1, \Givanov95\RolesPermissionsCrud\Support\EscalationGuard::held($user->fresh()));
+    }
+
+    public function test_the_permissions_list_does_not_query_per_row(): void
+    {
+        $manager = $this->userWith(['view-permissions', 'manage-permissions']);
+        $role = Role::create(['name' => 'boss', 'guard_name' => 'web']);
+
+        $queries = function () use ($manager): int {
+            // Once to warm up: a load after a change also reloads spatie's permission cache and the
+            // user's own roles and permissions, which do not depend on the rows.
+            $this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->assertOk();
+
+            return count(DB::getQueryLog());
+        };
+
+        $role->givePermissionTo(Permission::create(['name' => 'p1', 'guard_name' => 'web']));
+        $few = $queries();
+
+        foreach (range(2, 8) as $n) {
+            $role->givePermissionTo(Permission::create(['name' => "p{$n}", 'guard_name' => 'web']));
+        }
+
+        $this->assertSame($few, $queries());
     }
 }

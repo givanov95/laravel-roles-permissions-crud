@@ -37,16 +37,17 @@ class PermissionController extends Controller
      */
     public function index(): Response
     {
-        return $this->render(('permissions/Index'), [
+        return $this->render('permissions/Index', [
             'dataTable' => app(PermissionList::class)->payload(request()),
+        ], [
             // Whether the user may add records; each row says whether it may be edited (`can_manage`).
-            'can'       => ['create' => Authorizer::allows(request()->user(), 'permissions', Authorizer::MANAGE)],
+            'canCreate' => Authorizer::allows(request()->user(), 'permissions', Authorizer::MANAGE),
         ]);
     }
 
     public function create(): Response
     {
-        return $this->render(('permissions/Create'));
+        return $this->render('permissions/Create');
     }
 
     public function store(StorePermissionRequest $request): RedirectResponse
@@ -65,7 +66,7 @@ class PermissionController extends Controller
     {
         abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
 
-        return $this->render(('permissions/Edit'), [
+        return $this->render('permissions/Edit', [
             'permission' => [
                 'id'           => $permission->id,
                 'name'         => $permission->name,

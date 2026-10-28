@@ -36,24 +36,18 @@ final class EscalationGuard
             return collect();
         }
 
-        // Once per request and user: a form request and its controller both ask, and each answer is a
-        // query plus a gate check for every permission.
-        $request = app('request');
-        $key = 'roles-permissions-crud.held.'.($user instanceof Model ? $user->getMorphClass().':'.$user->getKey() : spl_object_id($user));
-
-        if ($request->attributes->has($key)) {
-            return $request->attributes->get($key);
-        }
-
-        $held = Models::permissions()
+        $resolve = fn (): Collection => Models::permissions()
             ->get(['id', 'name'])
             ->filter(fn (PermissionContract $permission) => $user->can($permission->name))
             ->pluck('id')
             ->values();
 
-        $request->attributes->set($key, $held);
+        // Remembered only for a stored user: an unsaved one has no key to tell it apart from another.
+        if (! $user instanceof Model || $user->getKey() === null) {
+            return $resolve();
+        }
 
-        return $held;
+        return app(HeldPermissions::class)->remember(app('request'), $user->getMorphClass().':'.$user->getKey(), $resolve);
     }
 
     /**
@@ -71,12 +65,22 @@ final class EscalationGuard
      * A permission is the user's to rename or delete only if they hold it, or if nobody has it: otherwise
      * renaming or deleting it would change roles or users beyond them. (Every role that carries a
      * permission the user does not hold is beyond them, so "nobody has it" is all that is left.)
+     *
+     * @param  Collection<int, int>|null  $held
      */
-    public static function canManagePermission(mixed $user, PermissionContract $permission): bool
+    public static function canManagePermission(mixed $user, PermissionContract $permission, ?Collection $held = null, ?bool $inUse = null): bool
     {
-        return ! self::enabled()
-            || ($user instanceof Authorizable && $user->can($permission->name))
-            || ! self::permissionInUse($permission);
+        if (! self::enabled()) {
+            return true;
+        }
+
+        // A list passes what it already knows ($held, $inUse from its counts), so a page of rows does
+        // not cost two queries each.
+        $holds = $held !== null
+            ? $held->contains($permission->id)
+            : $user instanceof Authorizable && $user->can($permission->name);
+
+        return $holds || ! ($inUse ?? self::permissionInUse($permission));
     }
 
     /**
@@ -142,10 +146,9 @@ final class EscalationGuard
      */
     public static function permissionInUse(PermissionContract $permission): bool
     {
-        return $permission->roles()->exists()
-            || DB::table(config('permission.table_names.model_has_permissions', 'model_has_permissions'))
-                ->where(config('permission.column_names.permission_pivot_key') ?? 'permission_id', $permission->id)
-                ->exists();
+        [$table, $key] = Models::permissionPivot();
+
+        return $permission->roles()->exists() || DB::table($table)->where($key, $permission->id)->exists();
     }
 
     /**

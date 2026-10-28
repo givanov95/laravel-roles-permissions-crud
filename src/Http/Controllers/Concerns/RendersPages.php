@@ -14,13 +14,20 @@ use Inertia\Response;
 trait RendersPages
 {
     /**
+     * The package's own page data goes under one `rolesPermissionsCrud` prop, so it cannot shadow a prop
+     * the application shares (a `can` for its layout, say).
+     *
      * @param  array<string, mixed>  $props
+     * @param  array<string, mixed>  $crud
      */
-    protected function render(string $path, array $props = []): Response
+    protected function render(string $path, array $props = [], array $crud = []): Response
     {
         return Inertia::render($this->page($path), [
             ...$props,
-            'routeNamePrefix' => (string) config('roles-permissions-crud.route_name_prefix', 'admin.'),
+            'rolesPermissionsCrud' => [
+                'routeNamePrefix' => (string) config('roles-permissions-crud.route_name_prefix', 'admin.'),
+                ...$crud,
+            ],
         ]);
     }
 

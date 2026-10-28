@@ -79,6 +79,19 @@ final class Models
     }
 
     /**
+     * The table that gives permissions straight to users (and other models) and its permission key column.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function permissionPivot(): array
+    {
+        return [
+            (string) config('permission.table_names.model_has_permissions', 'model_has_permissions'),
+            (string) (config('permission.column_names.permission_pivot_key') ?? 'permission_id'),
+        ];
+    }
+
+    /**
      * The route-bound role as the configured class. The route binds spatie's class, so that the routes
      * also work when cached; this swaps the instance without another query.
      */

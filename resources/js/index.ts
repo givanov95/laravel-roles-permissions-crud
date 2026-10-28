@@ -18,4 +18,5 @@ export { RolesPermissionsPlugin } from "./install";
 export type { RolesPermissionsPluginOptions } from "./install";
 export { setConfig, resetConfig, t, r, routeNamePrefix } from "./config";
 export type { RolesPermissionsConfig, Translator, Router } from "./config";
-export { useServerPage } from "./page";
+export { useServerPage, serverPageData } from "./page";
+export type { ServerPageData } from "./page";

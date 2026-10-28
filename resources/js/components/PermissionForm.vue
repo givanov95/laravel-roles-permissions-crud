@@ -3,7 +3,6 @@ import { Link, useForm } from "@inertiajs/vue3";
 import { computed } from "vue";
 
 import { r, t } from "../config";
-import { useServerPage } from "../page";
 import InputError from "./ui/InputError.vue";
 import InputLabel from "./ui/InputLabel.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
@@ -13,8 +12,6 @@ import TextInput from "./ui/TextInput.vue";
 const props = defineProps<{
     permission?: { id: number; name: string; is_protected: boolean };
 }>();
-
-useServerPage();
 
 const isEdit = computed(() => !!props.permission);
 

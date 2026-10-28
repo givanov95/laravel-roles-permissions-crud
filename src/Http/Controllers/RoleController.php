@@ -38,16 +38,17 @@ class RoleController extends Controller
      */
     public function index(): Response
     {
-        return $this->render(('roles/Index'), [
+        return $this->render('roles/Index', [
             'dataTable' => app(RoleList::class)->payload(request()),
+        ], [
             // Whether the user may add records; each row says whether it may be edited (`can_manage`).
-            'can'       => ['create' => Authorizer::allows(request()->user(), 'roles', Authorizer::MANAGE)],
+            'canCreate' => Authorizer::allows(request()->user(), 'roles', Authorizer::MANAGE),
         ]);
     }
 
     public function create(): Response
     {
-        return $this->render(('roles/Create'), [
+        return $this->render('roles/Create', [
             'permissions' => $this->permissionOptions(),
         ]);
     }
@@ -76,7 +77,7 @@ class RoleController extends Controller
     {
         abort_unless(EscalationGuard::canManageRole(request()->user(), $role), 403);
 
-        return $this->render(('roles/Edit'), [
+        return $this->render('roles/Edit', [
             'role' => [
                 'id'           => $role->id,
                 'name'         => $role->name,

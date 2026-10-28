@@ -23,7 +23,7 @@ class UpdatePermissionRequest extends FormRequest
             }
 
             // A protected permission keeps its name; say so instead of reporting a save that did nothing.
-            if ($this->input('name') !== $permission->name && in_array($permission->name, EscalationGuard::protectedPermissionNames(), true)) {
+            if (! $validator->errors()->has('name') && $this->input('name') !== $permission->name && in_array($permission->name, EscalationGuard::protectedPermissionNames(), true)) {
                 $validator->errors()->add('name', __('This permission is protected; its name cannot be changed.'));
             }
 

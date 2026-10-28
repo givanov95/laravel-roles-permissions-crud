@@ -10,7 +10,8 @@ use Illuminate\Contracts\Validation\Validator;
 use Spatie\Permission\Contracts\Role;
 
 /**
- * The checks on the permissions submitted for a role, done after the ordinary rules have passed.
+ * The checks on a submitted role beyond the ordinary rules: a protected role keeps its name, and the
+ * permission checks, which run only once the ordinary rules have passed.
  */
 trait ChecksPermissionGrants
 {
@@ -21,7 +22,7 @@ trait ChecksPermissionGrants
             $role = $role instanceof Role ? $role : null;
 
             // A protected role keeps its name; say so instead of saving the rest and dropping the name.
-            if ($role !== null && EscalationGuard::isProtectedRole($role) && $this->input('name') !== $role->name) {
+            if ($role !== null && ! $validator->errors()->has('name') && EscalationGuard::isProtectedRole($role) && $this->input('name') !== $role->name) {
                 $validator->errors()->add('name', __('This role is protected; its name cannot be changed.'));
             }
 
