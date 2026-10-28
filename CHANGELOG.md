@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v7.1.0
 
 ### Added
 - **Spatie teams** (`permission.teams`). The screens work in the current team (`getPermissionsTeamId()`):
