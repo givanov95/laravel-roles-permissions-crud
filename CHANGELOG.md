@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v7.1.2
 
 ### Fixed
 - **The permission form says before a save when the name cannot change.** A permission in use can be
