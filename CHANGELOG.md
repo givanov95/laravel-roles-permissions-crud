@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v6.3.0
 
 ### Fixed
 - **Only the configured guard.** The lists show only the roles and permissions of
