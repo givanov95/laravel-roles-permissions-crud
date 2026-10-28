@@ -20,8 +20,13 @@ use Spatie\Permission\Guard;
  */
 class RoleList extends ServerList
 {
-    /** @var Collection<int, int>|null */
-    private ?Collection $held = null;
+    /** @var Collection<int, int> */
+    private Collection $held;
+
+    protected function prepare(Request $request): void
+    {
+        $this->held = EscalationGuard::held($request->user());
+    }
 
     protected function table(Request $request): DataTable
     {
@@ -36,11 +41,11 @@ class RoleList extends ServerList
     protected function query(): Builder
     {
         $roles = Models::roles();
-        $table = $roles->getModel()->getTable();
+        $model = $roles->getModel();
 
         return $roles
-            ->select("{$table}.*")
-            ->selectSub($this->usersCount($table), 'users_count')
+            ->select("{$model->getTable()}.*")
+            ->selectSub($this->usersCount($model->getQualifiedKeyName()), 'users_count')
             ->with('permissions:id,name');
     }
 
@@ -49,10 +54,10 @@ class RoleList extends ServerList
      * the active auth guard, which may be a token guard during the request. Only the guard's user model
      * is counted, not other models that were given the role.
      */
-    protected function usersCount(string $rolesTable): \Illuminate\Database\Query\Builder
+    protected function usersCount(string $rolesKey): \Illuminate\Database\Query\Builder
     {
         [$pivot, $roleKey] = Models::rolePivot();
-        $query = DB::table($pivot)->selectRaw('count(*)')->whereColumn("{$pivot}.{$roleKey}", "{$rolesTable}.id");
+        $query = DB::table($pivot)->selectRaw('count(*)')->whereColumn("{$pivot}.{$roleKey}", $rolesKey);
         $userModel = Guard::getModelForGuard(Models::guard());
 
         if (is_string($userModel) && is_a($userModel, Model::class, true)) {
@@ -66,7 +71,6 @@ class RoleList extends ServerList
     {
         /** @var Model&Role $model */
         $user = $request->user();
-        $this->held ??= EscalationGuard::held($user);
 
         return [
             'id'           => $model->getKey(),

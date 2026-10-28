@@ -149,6 +149,18 @@ class ServerListTest extends TestCase
         ], $response->json('props.dataTable.data.0'));
     }
 
+    public function test_a_delete_goes_back_to_the_list_as_the_user_left_it(): void
+    {
+        $role = Role::create(['name' => 'editor', 'guard_name' => 'web']);
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $roles = route('admin.roles.index', ['page' => 2, 'filter' => ['global' => 'ed']]);
+
+        $this->from($roles)->delete(route('admin.roles.destroy', $role))->assertRedirect($roles);
+        // From anywhere else, the plain list.
+        $this->from(route('admin.permissions.edit', $permission))->delete(route('admin.permissions.destroy', $permission))
+            ->assertRedirect(route('admin.permissions.index'));
+    }
+
     public function test_an_application_can_bind_its_own_list(): void
     {
         Role::create(['name' => 'editor', 'guard_name' => 'web']);

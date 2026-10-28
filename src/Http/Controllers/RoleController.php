@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Controllers;
 
 use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\AuthorizesCrudAccess;
+use Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns\RedirectsToIndex;
 use Givanov95\RolesPermissionsCrud\Http\Requests\StoreRoleRequest;
 use Givanov95\RolesPermissionsCrud\Http\Requests\UpdateRoleRequest;
 use Givanov95\RolesPermissionsCrud\Lists\RoleList;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -22,6 +22,7 @@ use Spatie\Permission\Models\Role;
 class RoleController extends Controller
 {
     use AuthorizesCrudAccess;
+    use RedirectsToIndex;
 
     public function __construct()
     {
@@ -32,10 +33,10 @@ class RoleController extends Controller
      * The roles, paged, searched and sorted on the server. Bind your own {@see RoleList} to change the
      * query, the columns or the rows.
      */
-    public function index(Request $request, RoleList $list): Response
+    public function index(): Response
     {
         return Inertia::render($this->page('roles/Index'), [
-            'dataTable' => $list->payload($request),
+            'dataTable' => app(RoleList::class)->payload(request()),
         ]);
     }
 
@@ -110,7 +111,7 @@ class RoleController extends Controller
         if (EscalationGuard::isProtectedRole($role)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is protected and cannot be deleted.')]);
 
-            return redirect()->route($this->routeName('roles.index'));
+            return $this->redirectToIndex('roles');
         }
 
         $lost = EscalationGuard::locksOut(request()->user(), $role, collect());
@@ -120,20 +121,20 @@ class RoleController extends Controller
                 'permissions' => $lost->implode(', '),
             ])]);
 
-            return redirect()->route($this->routeName('roles.index'));
+            return $this->redirectToIndex('roles');
         }
 
         if (! EscalationGuard::deletesInUse() && EscalationGuard::roleInUse($role)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('This role is assigned and cannot be deleted. Take it away from everyone first.')]);
 
-            return redirect()->route($this->routeName('roles.index'));
+            return $this->redirectToIndex('roles');
         }
 
         DB::transaction(fn () => Models::role($role)->delete());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been deleted.')]);
 
-        return redirect()->route($this->routeName('roles.index'));
+        return $this->redirectToIndex('roles');
     }
 
     /**

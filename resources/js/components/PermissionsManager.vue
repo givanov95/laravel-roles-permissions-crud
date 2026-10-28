@@ -62,6 +62,7 @@ const destroy = () => {
                 type="search"
                 :value="table.state.globalFilter"
                 :placeholder="t('Search permissions…')"
+                :aria-label="t('Search permissions')"
                 class="block w-full max-w-xs rounded-md border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 @input="table.onGlobalFilterChange(($event.target as HTMLInputElement).value)"
             />

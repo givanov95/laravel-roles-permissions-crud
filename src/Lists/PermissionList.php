@@ -17,8 +17,13 @@ use Spatie\Permission\Contracts\Permission;
  */
 class PermissionList extends ServerList
 {
-    /** @var array<int, string>|null */
-    private ?array $protected = null;
+    /** @var array<int, string> */
+    private array $protected = [];
+
+    protected function prepare(Request $request): void
+    {
+        $this->protected = EscalationGuard::protectedPermissionNames();
+    }
 
     protected function table(Request $request): DataTable
     {
@@ -38,8 +43,6 @@ class PermissionList extends ServerList
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Permission $model */
-        $this->protected ??= EscalationGuard::protectedPermissionNames();
-
         return [
             'id'           => $model->getKey(),
             'name'         => $model->name,

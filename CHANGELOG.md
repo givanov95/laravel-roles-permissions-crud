@@ -18,6 +18,8 @@
   Bind a subclass to change them, instead of overriding `index()`.
 - `page()`, `routeName()`, `permissionOptions()` and `isProtected()` on the controllers are
   `protected`, so a subclass can use them.
+- After a delete, the list opens where the user left it (page, search, sort).
+- Without a translator, `t()` fills in `:name` placeholders.
 
 ### Migrating from 6.x
 1. `composer require givanov95/laravel-roles-permissions-crud:^7.0` and

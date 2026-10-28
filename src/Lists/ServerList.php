@@ -24,6 +24,7 @@ abstract class ServerList
      */
     public function payload(Request $request): array
     {
+        $this->prepare($request);
         $table = $this->table($request);
 
         // The request's sort when it names an orderable column, else the default one, ascending: the
@@ -50,6 +51,12 @@ abstract class ServerList
      * @return array<string, mixed>
      */
     abstract protected function row(Model $model, Request $request): array;
+
+    /**
+     * Work out, once per payload, what every row needs (the user's permissions and the like). Values kept
+     * on the list are set here, so a list bound as a singleton does not carry them over to another user.
+     */
+    protected function prepare(Request $request): void {}
 
     protected function defaultSort(): string
     {
