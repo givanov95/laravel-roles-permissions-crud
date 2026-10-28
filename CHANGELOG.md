@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v7.0.0
 
 ### Breaking
 - **The lists are paged, searched and sorted on the server**, with
