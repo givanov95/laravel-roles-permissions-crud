@@ -7,6 +7,7 @@ namespace Givanov95\RolesPermissionsCrud\Http\Requests;
 use Givanov95\RolesPermissionsCrud\Http\Requests\Concerns\ChecksPermissionGrants;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,9 +32,9 @@ class UpdateRoleRequest extends FormRequest
         $table = config('permission.table_names.roles', 'roles');
 
         return [
-            'name'          => ['required', 'string', 'max:255', Rule::unique($table, 'name')->ignore($roleId)],
+            'name'          => ['required', 'string', 'max:255', Rule::unique($table, 'name')->where('guard_name', Models::guard())->ignore($roleId)],
             'permissions'   => ['array'],
-            'permissions.*' => ['integer', Rule::exists(config('permission.table_names.permissions', 'permissions'), 'id')->where('guard_name', config('roles-permissions-crud.guard', 'web'))],
+            'permissions.*' => ['integer', Rule::exists(config('permission.table_names.permissions', 'permissions'), 'id')->where('guard_name', Models::guard())],
         ];
     }
 }

@@ -6,6 +6,8 @@ namespace Givanov95\RolesPermissionsCrud\Http\Controllers\Concerns;
 
 use Closure;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
+use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -29,6 +31,14 @@ trait AuthorizesCrudAccess
             $ability = $request->route()?->getActionMethod() === 'index' ? Authorizer::VIEW : Authorizer::MANAGE;
 
             abort_unless(Authorizer::allows($request->user(), $resource, $ability), 403);
+
+            // A role or permission of another guard is not this package's to show or change. Checked
+            // here, before the form request, so it is a 404 and not a validation error or a 500.
+            foreach (['role', 'permission'] as $parameter) {
+                $model = $request->route()?->parameter($parameter);
+
+                abort_if($model instanceof Model && $model->getAttribute('guard_name') !== Models::guard(), 404);
+            }
 
             return $next($request);
         };

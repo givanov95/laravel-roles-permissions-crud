@@ -6,7 +6,7 @@ namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Support\Collection;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -34,10 +34,10 @@ final class EscalationGuard
             return collect();
         }
 
-        return Permission::query()
-            ->where('guard_name', config('roles-permissions-crud.guard', 'web'))
+        return Models::permissionClass()::query()
+            ->where('guard_name', Models::guard())
             ->get(['id', 'name'])
-            ->filter(fn (Permission $permission) => $user->can($permission->name))
+            ->filter(fn (PermissionContract $permission) => $user->can($permission->name))
             ->pluck('id')
             ->values();
     }
@@ -117,7 +117,8 @@ final class EscalationGuard
         if (self::enabled() && self::protectedRoles() !== []) {
             $names = [
                 ...$names,
-                ...Permission::query()
+                ...Models::permissionClass()::query()
+                    ->where('guard_name', Models::guard())
                     ->whereHas('roles', fn ($query) => $query->whereIn('name', self::protectedRoles()))
                     ->pluck('name')
                     ->all(),

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Http\Requests\Concerns;
 
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Contracts\Validation\Validator;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -29,7 +29,7 @@ trait ChecksPermissionGrants
 
             if ($beyond->isNotEmpty()) {
                 $validator->errors()->add('permissions', __('You cannot grant permissions you do not hold: :permissions.', [
-                    'permissions' => Permission::query()->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
+                    'permissions' => Models::permissionClass()::query()->where('guard_name', Models::guard())->whereIn('id', $beyond)->orderBy('name')->pluck('name')->implode(', '),
                 ]));
 
                 return;

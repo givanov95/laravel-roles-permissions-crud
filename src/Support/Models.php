@@ -34,6 +34,14 @@ final class Models
     }
 
     /**
+     * The guard whose roles and permissions this package lists and changes (`roles-permissions-crud.guard`).
+     */
+    public static function guard(): string
+    {
+        return (string) config('roles-permissions-crud.guard', 'web');
+    }
+
+    /**
      * The route-bound role as the configured class. The route binds spatie's class, so that the routes
      * also work when cached; this swaps the instance without another query.
      */

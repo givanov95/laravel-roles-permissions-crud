@@ -14,7 +14,8 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Contracts\Permission as PermissionContract;
+use Spatie\Permission\Contracts\Role as RoleContract;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -46,10 +47,11 @@ class RoleController extends Controller
 
         return Inertia::render($this->page('roles/Index'), [
             'roles' => Models::roleClass()::query()
+                ->where('guard_name', Models::guard())
                 ->with('permissions:id,name')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (Role $role) => [
+                ->map(fn (RoleContract $role) => [
                     'id'           => $role->id,
                     'name'         => $role->name,
                     'users_count'  => (int) ($userCounts[$role->id] ?? 0),
@@ -73,7 +75,7 @@ class RoleController extends Controller
         DB::transaction(function () use ($request): void {
             $role = Models::roleClass()::create([
                 'name'       => $request->validated('name'),
-                'guard_name' => config('roles-permissions-crud.guard', 'web'),
+                'guard_name' => Models::guard(),
             ]);
 
             // Cast to int: form values arrive as numeric strings and Spatie treats
@@ -153,11 +155,11 @@ class RoleController extends Controller
         $own = $role?->permissions->pluck('id') ?? collect();
 
         return Models::permissionClass()::query()
-            ->where('guard_name', config('roles-permissions-crud.guard', 'web'))
+            ->where('guard_name', Models::guard())
             ->orderBy('name')
             ->get(['id', 'name'])
-            ->filter(fn (Permission $permission) => ! EscalationGuard::enabled() || $held->contains($permission->id) || $own->contains($permission->id))
-            ->map(fn (Permission $permission) => [
+            ->filter(fn (PermissionContract $permission) => ! EscalationGuard::enabled() || $held->contains($permission->id) || $own->contains($permission->id))
+            ->map(fn (PermissionContract $permission) => [
                 'value' => $permission->id,
                 'label' => $permission->name,
             ])
