@@ -66,13 +66,13 @@ class PageContractTest extends DefaultsTestCase
         Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
         $viewer = $this->userWith(['view-roles', 'view-permissions']);
 
-        $this->actingAs($viewer)->getJson(route('admin.roles.index'), $this->inertia())
-            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
-            ->assertJsonPath('props.dataTable.data.0.delete_refusal', null);
+        $role = collect($this->actingAs($viewer)->getJson(route('admin.roles.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', 'editor');
+        $permission = collect($this->actingAs($viewer)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', 'view-posts');
 
-        $this->actingAs($viewer)->getJson(route('admin.permissions.index'), $this->inertia())
-            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
-            ->assertJsonPath('props.dataTable.data.0.delete_refusal', null);
+        $this->assertSame([true, false, null], [$role['is_protected'], $role['can_delete'], $role['delete_refusal']]);
+        $this->assertSame([true, false, null], [$permission['is_protected'], $permission['can_delete'], $permission['delete_refusal']]);
     }
 
     public function test_a_user_who_may_manage_is_offered_changes_within_their_reach(): void

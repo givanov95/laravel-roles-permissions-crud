@@ -31,7 +31,7 @@ const show = ref(false);
     </button>
 
     <!-- Mounted only while open: one per refused row otherwise, and none left behind when the row goes. -->
-    <ConfirmationModal v-if="show" :show="show" @close="show = false">
+    <ConfirmationModal v-if="show" :show="true" @close="show = false">
         <template #title>{{ t('Cannot delete ":name"', { name }) }}</template>
         <template #content>{{ reason }}</template>
         <template #footer>
