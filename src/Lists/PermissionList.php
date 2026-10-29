@@ -82,17 +82,19 @@ class PermissionList extends ServerList
         $canManage = $this->mayManage
             && ! Models::inTeam()
             && EscalationGuard::canManagePermission($request->user(), $model, $this->held, $inUse);
+        // Why PermissionController::destroy() would refuse it, so the list offers no Delete that ends in an
+        // error and can say why. Not asked when the user cannot manage it: that is a 403.
+        $refusal = $canManage ? EscalationGuard::permissionDeleteRefusal($model, $this->protected, $inUse) : null;
 
         return [
-            'id'           => $model->getKey(),
-            'name'         => $model->name,
-            'roles_count'  => (int) $model->getAttribute('roles_count'),
-            'direct_count' => (int) $model->getAttribute('direct_count'),
-            'is_protected' => $isProtected,
-            'can_manage'   => $canManage,
-            // What PermissionController::destroy() lets through, so the list offers no Delete that ends in
-            // an error.
-            'can_delete'   => $canManage && EscalationGuard::permissionDeleteRefusal($model, $this->protected, $inUse) === null,
+            'id'             => $model->getKey(),
+            'name'           => $model->name,
+            'roles_count'    => (int) $model->getAttribute('roles_count'),
+            'direct_count'   => (int) $model->getAttribute('direct_count'),
+            'is_protected'   => $isProtected,
+            'can_manage'     => $canManage,
+            'can_delete'     => $canManage && $refusal === null,
+            'delete_refusal' => $refusal,
         ];
     }
 }

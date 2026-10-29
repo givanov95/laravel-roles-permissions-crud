@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { onMounted, onUnmounted, watch } from "vue";
 
 const props = withDefaults(
     defineProps<{ show?: boolean; maxWidth?: string }>(),
@@ -16,6 +16,14 @@ watch(
         document.body.style.overflow = shown ? "hidden" : "";
     },
 );
+
+// A modal mounted already open (and unmounted while open) locks and frees the page as well.
+onMounted(() => {
+    if (props.show) document.body.style.overflow = "hidden";
+});
+onUnmounted(() => {
+    if (props.show) document.body.style.overflow = "";
+});
 </script>
 
 <template>

@@ -94,8 +94,8 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
 
    | List        | Search | Sort                   | Row fields                                                                 |
    | ----------- | ------ | ---------------------- | -------------------------------------------------------------------------- |
-   | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `others_count`, `permissions`, `is_protected`, `can_manage`, `can_delete` |
-   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `direct_count`, `is_protected`, `can_manage`, `can_delete`               |
+   | roles       | `name` | `name`, `users_count`  | `id`, `name`, `users_count`, `others_count`, `permissions`, `is_protected`, `can_manage`, `can_delete`, `delete_refusal` |
+   | permissions | `name` | `name`, `roles_count`  | `id`, `name`, `roles_count`, `direct_count`, `is_protected`, `can_manage`, `can_delete`, `delete_refusal`               |
 
    They are sorted by name by default, and the page size is `default_per_page` in
    `config/data-table.php`. `users_count` counts only the guard's user model. To change the query,
@@ -115,9 +115,15 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    and delete it: the `manage-*` permission and, while escalation is prevented, a record within their
    reach. `can_delete` adds what a delete checks: not protected, and not in use unless
    `allow_delete_in_use` (`others_count`, models other than users that have the role, and
-   `direct_count`, users given the permission straight, show what keeps a record in use). The
-   components read these from the page, so the shells do not forward them, and show only the buttons
-   that lead somewhere.
+   `direct_count`, users given the permission straight, show what keeps a record in use).
+   `delete_refusal` says why, when the user may manage the record but a delete would be refused: the
+   translated message the delete itself would show (protected, in use, or the user would lose access
+   they need to manage access), and `null` otherwise. Show it as the hint on a disabled Delete rather
+   than working the reason out from the counts, which cannot tell, for example, a role in use from
+   one whose delete would lock the user out. The components read these from the page, so the shells
+   do not forward them: they show Edit and Delete only where they lead somewhere, and a refused
+   Delete greyed out, with the reason as its hint and in a dialog on a click (a hint alone does not
+   show on a touch screen or from the keyboard).
 
 ## Security
 

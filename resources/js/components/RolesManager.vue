@@ -11,6 +11,7 @@ import SortableHeader from "./ui/SortableHeader.vue";
 import ConfirmationModal from "./ui/ConfirmationModal.vue";
 import DangerButton from "./ui/DangerButton.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
+import RefusedDeleteButton from "./ui/RefusedDeleteButton.vue";
 import SecondaryButton from "./ui/SecondaryButton.vue";
 
 interface Role {
@@ -24,6 +25,11 @@ interface Role {
     can_manage: boolean;
     /** Whether a delete would go through (missing from an older server: decided here as before). */
     can_delete?: boolean;
+    /**
+     * Why a delete would be refused, translated on the server; null when it would go through or the user
+     * may not manage the record at all (missing from an older server: no reason shown).
+     */
+    delete_refusal?: string | null;
 }
 
 const canDelete = (role: Role): boolean => role.can_delete ?? (!role.is_protected && role.can_manage);
@@ -132,6 +138,11 @@ const destroy = () => {
                             >
                                 {{ t('Delete') }}
                             </button>
+                            <RefusedDeleteButton
+                                v-else-if="typeof role.delete_refusal === 'string'"
+                                :name="role.name"
+                                :reason="role.delete_refusal"
+                            />
                         </div>
                     </td>
                 </tr>

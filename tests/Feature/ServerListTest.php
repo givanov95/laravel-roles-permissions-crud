@@ -105,14 +105,15 @@ class ServerListTest extends TestCase
         $role->givePermissionTo(Permission::create(['name' => 'view-posts', 'guard_name' => 'web']));
 
         $this->assertSame([
-            'id'           => $role->id,
-            'name'         => 'editor',
-            'users_count'  => 0,
-            'others_count' => 0,
-            'permissions'  => ['view-posts'],
-            'is_protected' => false,
-            'can_manage'   => true,
-            'can_delete'   => true,
+            'id'             => $role->id,
+            'name'           => 'editor',
+            'users_count'    => 0,
+            'others_count'   => 0,
+            'permissions'    => ['view-posts'],
+            'is_protected'   => false,
+            'can_manage'     => true,
+            'can_delete'     => true,
+            'delete_refusal' => null,
         ], $this->roles()->json('props.dataTable.data.0'));
     }
 
@@ -144,13 +145,14 @@ class ServerListTest extends TestCase
 
         $this->assertSame(['view-common', 'view-rare'], $this->names($response));
         $this->assertSame([
-            'id'           => $common->id,
-            'name'         => 'view-common',
-            'roles_count'  => 2,
-            'direct_count' => 0,
-            'is_protected' => false,
-            'can_manage'   => true,
-            'can_delete'   => false,
+            'id'             => $common->id,
+            'name'           => 'view-common',
+            'roles_count'    => 2,
+            'direct_count'   => 0,
+            'is_protected'   => false,
+            'can_manage'     => true,
+            'can_delete'     => false,
+            'delete_refusal' => 'This permission is in use and cannot be deleted. Take it away from every role and user first.',
         ], $response->json('props.dataTable.data.0'));
     }
 
@@ -163,13 +165,16 @@ class ServerListTest extends TestCase
         $this->roles()
             ->assertJsonPath('props.dataTable.data.0.users_count', 0)
             ->assertJsonPath('props.dataTable.data.0.others_count', 2)
-            ->assertJsonPath('props.dataTable.data.0.can_delete', false);
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', 'This role is assigned and cannot be deleted. Take it away from everyone first.');
 
         // The list matches what a delete does.
         $this->delete(route('admin.roles.destroy', $role))->assertInertiaFlash('toast.type', 'error');
 
         config(['roles-permissions-crud.allow_delete_in_use' => true]);
-        $this->roles()->assertJsonPath('props.dataTable.data.0.can_delete', true);
+        $this->roles()
+            ->assertJsonPath('props.dataTable.data.0.can_delete', true)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', null);
         $this->delete(route('admin.roles.destroy', $role))->assertInertiaFlash('toast.type', 'success');
     }
 
@@ -179,8 +184,12 @@ class ServerListTest extends TestCase
         Role::create(['name' => 'admin', 'guard_name' => 'web']);
         Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
 
-        $this->roles()->assertJsonPath('props.dataTable.data.0.can_delete', false);
-        $this->permissions()->assertJsonPath('props.dataTable.data.0.can_delete', false);
+        $this->roles()
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', 'This role is protected and cannot be deleted.');
+        $this->permissions()
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', 'This permission is protected and cannot be deleted.');
     }
 
     public function test_a_permission_given_only_straight_to_someone_says_so_and_offers_no_delete(): void
@@ -192,7 +201,9 @@ class ServerListTest extends TestCase
         $rows = collect($this->permissions()->json('props.dataTable.data'))->keyBy('name');
 
         $this->assertSame([0, 1, false], [$rows['view-posts']['roles_count'], $rows['view-posts']['direct_count'], $rows['view-posts']['can_delete']]);
+        $this->assertSame('This permission is in use and cannot be deleted. Take it away from every role and user first.', $rows['view-posts']['delete_refusal']);
         $this->assertTrue($rows['unused']['can_delete']);
+        $this->assertNull($rows['unused']['delete_refusal']);
         $this->delete(route('admin.permissions.destroy', $permission))->assertInertiaFlash('toast.type', 'error');
     }
 

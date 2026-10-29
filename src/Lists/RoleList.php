@@ -28,8 +28,9 @@ class RoleList extends ServerList
     private bool $mayManage = false;
 
     /**
-     * The roles the user has, the only ones whose delete could lock them out. Read only when a role in
-     * use may be deleted: otherwise the user's own roles are in use, and that refuses the delete first.
+     * The roles the user has, the only ones whose delete could lock them out. Read whenever escalation
+     * is prevented, as the delete checks a lock-out before whether the role is in use: the row's
+     * `delete_refusal` has to be the reason the delete gives.
      *
      * @var Collection<int, int|string>
      */
@@ -44,7 +45,7 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->ownRoleIds = EscalationGuard::deletesInUse() && $user instanceof Model && method_exists($user, 'roles')
+        $this->ownRoleIds = EscalationGuard::enabled() && $user instanceof Model && method_exists($user, 'roles')
             ? $user->roles()->pluck($user->roles()->getRelated()->getQualifiedKeyName())
             : collect();
     }
@@ -140,25 +141,29 @@ class RoleList extends ServerList
         $canManage = $this->mayManage
             && ! Models::sharedAcrossTeams($model)
             && EscalationGuard::canManageRole($user, $model, $this->held);
+        $users = (int) $model->getAttribute('users_count');
+        $others = (int) $model->getAttribute('others_count');
+        // Why RoleController::destroy() would refuse it, so the list offers no Delete that ends in an error
+        // and can say why. Users and others together are every assignment, as EscalationGuard::roleInUse()
+        // counts them. (Inside a team they are the team's; a role with assignments in other teams is a
+        // global one, read-only there anyway.) Not asked when the user cannot manage it: that is a 403.
+        $refusal = $canManage ? EscalationGuard::roleDeleteRefusal(
+            $user,
+            $model,
+            $users + $others > 0,
+            $this->ownRoleIds,
+        ) : null;
 
         return [
-            'id'           => $model->getKey(),
-            'name'         => $model->name,
-            'users_count'  => (int) $model->getAttribute('users_count'),
-            'others_count' => (int) $model->getAttribute('others_count'),
-            'permissions'  => $model->permissions->pluck('name')->values()->all(),
-            'is_protected' => EscalationGuard::isProtectedRole($model),
-            'can_manage'   => $canManage,
-            // What RoleController::destroy() lets through, so the list offers no Delete that ends in an error.
-            // Users and others together are every assignment, as EscalationGuard::roleInUse() counts
-            // them. (Inside a team they are the team's; a role with assignments in other teams is a
-            // global one, read-only there anyway.)
-            'can_delete'   => $canManage && EscalationGuard::roleDeleteRefusal(
-                $user,
-                $model,
-                (int) $model->getAttribute('users_count') + (int) $model->getAttribute('others_count') > 0,
-                $this->ownRoleIds,
-            ) === null,
+            'id'             => $model->getKey(),
+            'name'           => $model->name,
+            'users_count'    => $users,
+            'others_count'   => $others,
+            'permissions'    => $model->permissions->pluck('name')->values()->all(),
+            'is_protected'   => EscalationGuard::isProtectedRole($model),
+            'can_manage'     => $canManage,
+            'can_delete'     => $canManage && $refusal === null,
+            'delete_refusal' => $refusal,
         ];
     }
 }
