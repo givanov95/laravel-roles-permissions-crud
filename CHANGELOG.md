@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **The lists say why a record cannot be deleted.** Rows send `delete_refusal`: the translated message
+  the delete would refuse with (protected, in use, or the user would lose access they need), or `null`
+  when the delete would go through or the user may not manage the record. `RolesManager` and
+  `PermissionsManager` show a refused Delete disabled, with the reason as its hint, instead of hiding
+  it. Applications with their own lists can show the same hint instead of guessing the reason from
+  the counts, which said "in use" for the user's own role when `allow_delete_in_use` let deletes in use
+  through and the delete was refused because it would lock them out.
+
 ## v7.1.2
 
 ### Fixed

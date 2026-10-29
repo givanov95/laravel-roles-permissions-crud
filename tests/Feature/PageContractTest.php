@@ -58,6 +58,23 @@ class PageContractTest extends DefaultsTestCase
             ->assertJsonPath('props.dataTable.data.0.can_manage', false);
     }
 
+    public function test_a_user_who_may_only_look_is_given_no_reason_to_refuse_a_delete(): void
+    {
+        // Deleting is not theirs at all (a 403), so there is no refusal to explain, even for a protected record.
+        config(['roles-permissions-crud.protected_roles' => ['editor'], 'roles-permissions-crud.protected_permissions' => ['view-posts']]);
+        Role::create(['name' => 'editor', 'guard_name' => 'web']);
+        Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $viewer = $this->userWith(['view-roles', 'view-permissions']);
+
+        $this->actingAs($viewer)->getJson(route('admin.roles.index'), $this->inertia())
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', null);
+
+        $this->actingAs($viewer)->getJson(route('admin.permissions.index'), $this->inertia())
+            ->assertJsonPath('props.dataTable.data.0.can_delete', false)
+            ->assertJsonPath('props.dataTable.data.0.delete_refusal', null);
+    }
+
     public function test_a_user_who_may_manage_is_offered_changes_within_their_reach(): void
     {
         Role::create(['name' => 'boss', 'guard_name' => 'web'])->givePermissionTo(Permission::create(['name' => 'delete-everything', 'guard_name' => 'web']));
@@ -150,11 +167,15 @@ class PageContractTest extends DefaultsTestCase
         $user = $this->userWith()->assignRole($admin);
 
         $rows = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->json('props.dataTable.data'))
-            ->pluck('can_delete', 'name');
+            ->keyBy('name');
 
         // Deleting their own admin role would take manage-roles away from them; the delete says so too.
-        $this->assertFalse($rows['admin']);
-        $this->assertTrue($rows['spare']);
+        // The row says that, not that the role is in use: deletes in use are allowed here.
+        $this->assertFalse($rows['admin']['can_delete']);
+        $this->assertStringStartsWith('You cannot delete this role: you would lose ', $rows['admin']['delete_refusal']);
+        $this->assertStringContainsString('manage-roles', $rows['admin']['delete_refusal']);
+        $this->assertTrue($rows['spare']['can_delete']);
+        $this->assertNull($rows['spare']['delete_refusal']);
         $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.type', 'error');
     }
 }

@@ -24,9 +24,18 @@ interface Role {
     can_manage: boolean;
     /** Whether a delete would go through (missing from an older server: decided here as before). */
     can_delete?: boolean;
+    /**
+     * Why a delete would be refused, translated on the server; null when it would go through or the user
+     * may not manage the record at all (missing from an older server: no reason shown).
+     */
+    delete_refusal?: string | null;
 }
 
 const canDelete = (role: Role): boolean => role.can_delete ?? (!role.is_protected && role.can_manage);
+
+/** The reason to show on a Delete that is refused, or null when there is none to show. */
+const deleteRefusal = (role: Role): string | null =>
+    role.can_delete === false && typeof role.delete_refusal === "string" ? role.delete_refusal : null;
 
 const props = defineProps<{
     /** `RoleController::index()`: paged, searched and sorted on the server. */
@@ -131,6 +140,15 @@ const destroy = () => {
                                 @click="confirmDelete(role)"
                             >
                                 {{ t('Delete') }}
+                            </button>
+                            <button
+                                v-else-if="deleteRefusal(role)"
+                                type="button"
+                                aria-disabled="true"
+                                :title="deleteRefusal(role) as string"
+                                class="cursor-not-allowed rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-400"
+                            >
+                                {{ t('Delete') }}<span class="sr-only">: {{ deleteRefusal(role) }}</span>
                             </button>
                         </div>
                     </td>
