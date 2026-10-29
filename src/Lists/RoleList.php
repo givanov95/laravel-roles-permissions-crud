@@ -8,6 +8,7 @@ use Givanov95\DataTable\DataTable;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Givanov95\RolesPermissionsCrud\Support\OwnAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -28,13 +29,11 @@ class RoleList extends ServerList
     private bool $mayManage = false;
 
     /**
-     * The roles the user has, the only ones whose delete could lock them out. Read whenever escalation
-     * is prevented, as the delete checks a lock-out before whether the role is in use: the row's
-     * `delete_refusal` has to be the reason the delete gives.
-     *
-     * @var Collection<int, int|string>
+     * The user's roles and permissions, read once for the page: only their own roles can lock them
+     * out. Read whenever escalation is prevented, as the delete checks a lock-out before whether the
+     * role is in use: the row's `delete_refusal` has to be the reason the delete gives.
      */
-    private Collection $ownRoleIds;
+    private ?OwnAccess $own = null;
 
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
@@ -45,9 +44,7 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->ownRoleIds = EscalationGuard::enabled() && $user instanceof Model && method_exists($user, 'roles')
-            ? $user->roles()->pluck($user->roles()->getRelated()->getQualifiedKeyName())
-            : collect();
+        $this->own = EscalationGuard::ownAccess($user);
     }
 
     protected function table(Request $request): DataTable
@@ -151,7 +148,7 @@ class RoleList extends ServerList
             $user,
             $model,
             $users + $others > 0,
-            $this->ownRoleIds,
+            $this->own,
         ) : null;
 
         return [

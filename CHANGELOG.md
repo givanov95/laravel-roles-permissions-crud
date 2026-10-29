@@ -12,6 +12,12 @@
   the counts, which said "in use" for the user's own role when `allow_delete_in_use` let deletes in use
   through and the delete was refused because it would lock them out.
 
+### Fixed
+- **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
+  read their roles and permissions again to check whether deleting it would lock them out: three
+  queries a row. They are now read once, in `RoleList::prepare()`, and handed to
+  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess`.
+
 ## v7.1.2
 
 ### Fixed

@@ -158,6 +158,39 @@ class PageContractTest extends DefaultsTestCase
         $this->assertSame($few, $queries());
     }
 
+    public function test_the_roles_list_does_not_query_per_own_role(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        $queries = function () use ($user): int {
+            // Once to warm up, as in the permissions list test above.
+            $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $rows = $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk()
+                ->json('props.dataTable.data');
+
+            // Every role on the page is the user's, so each one is weighed for a lock-out.
+            $this->assertNotEmpty($rows);
+            $this->assertTrue(collect($rows)->every(fn (array $row) => $row['can_manage']));
+
+            return count(DB::getQueryLog());
+        };
+
+        $few = $queries();
+
+        foreach (range(1, 6) as $n) {
+            $role = Role::create(['name' => "own-{$n}", 'guard_name' => 'web']);
+            $role->givePermissionTo(Permission::findOrCreate('view-roles', 'web'));
+            $user->assignRole($role);
+        }
+
+        $this->assertSame($few, $queries());
+    }
+
     public function test_the_list_offers_no_delete_that_would_lock_the_user_out(): void
     {
         config(['roles-permissions-crud.allow_delete_in_use' => true]);
