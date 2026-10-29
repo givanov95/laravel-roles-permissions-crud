@@ -23,7 +23,16 @@ final readonly class OwnAccess
         public Collection $direct,
     ) {}
 
-    public function hasRole(RoleContract $role): bool
+    /**
+     * Nothing to weigh: escalation is not prevented, the user has no roles of their own, or the list
+     * will not ask.
+     */
+    public static function none(): self
+    {
+        return new self(collect(), collect());
+    }
+
+    public function includes(RoleContract $role): bool
     {
         return $this->roles->contains(fn (RoleContract $own) => $own->getKey() === $role->getKey());
     }

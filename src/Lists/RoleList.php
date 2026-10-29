@@ -30,10 +30,11 @@ class RoleList extends ServerList
 
     /**
      * The user's roles and permissions, read once for the page: only their own roles can lock them
-     * out. Read whenever escalation is prevented, as the delete checks a lock-out before whether the
-     * role is in use: the row's `delete_refusal` has to be the reason the delete gives.
+     * out. Read whenever escalation is prevented and the user may manage roles (otherwise no row asks),
+     * as the delete checks a lock-out before whether the role is in use: the row's `delete_refusal`
+     * has to be the reason the delete gives.
      */
-    private ?OwnAccess $own = null;
+    private OwnAccess $own;
 
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
@@ -44,7 +45,7 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->own = EscalationGuard::ownAccess($user);
+        $this->own = $this->mayManage ? EscalationGuard::ownAccess($user) : OwnAccess::none();
     }
 
     protected function table(Request $request): DataTable

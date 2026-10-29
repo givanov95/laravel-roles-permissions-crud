@@ -173,9 +173,12 @@ class PageContractTest extends DefaultsTestCase
             $rows = $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk()
                 ->json('props.dataTable.data');
 
-            // Every role on the page is the user's, so each one is weighed for a lock-out.
-            $this->assertNotEmpty($rows);
-            $this->assertTrue(collect($rows)->every(fn (array $row) => $row['can_manage']));
+            // Every role on the page is the user's, so each one is weighed for a lock-out: the admin role
+            // would lock them out, the others only give view-roles, which admin keeps, and are in use.
+            $rows = collect($rows)->keyBy('name');
+            $this->assertTrue($rows->every(fn (array $row) => $row['can_manage']));
+            $this->assertStringStartsWith('You cannot delete this role: you would lose ', $rows['admin']['delete_refusal']);
+            $rows->except('admin')->each(fn (array $row) => $this->assertStringStartsWith('This role is assigned', $row['delete_refusal']));
 
             return count(DB::getQueryLog());
         };

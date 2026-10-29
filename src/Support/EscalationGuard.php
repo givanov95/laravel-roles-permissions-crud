@@ -129,7 +129,7 @@ final class EscalationGuard
     {
         $own ??= self::ownAccess($user);
 
-        if ($own === null || ! $own->hasRole($role)) {
+        if (! $own->includes($role)) {
             return collect();
         }
 
@@ -148,13 +148,13 @@ final class EscalationGuard
 
     /**
      * The user's roles (with their permissions) and direct permissions in the package's guard, which
-     * {@see locksOut()} weighs. Null when there is nothing to weigh: escalation is not prevented, or the
-     * user has no roles and permissions of their own (no HasRoles).
+     * {@see locksOut()} weighs. None when escalation is not prevented or the user has no roles and
+     * permissions of their own (no HasRoles).
      */
-    public static function ownAccess(mixed $user): ?OwnAccess
+    public static function ownAccess(mixed $user): OwnAccess
     {
         if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
-            return null;
+            return OwnAccess::none();
         }
 
         return new OwnAccess(
@@ -198,14 +198,12 @@ final class EscalationGuard
             return __('This role is protected and cannot be deleted.');
         }
 
-        if ($own === null || $own->hasRole($role)) {
-            $lost = self::locksOut($user, $role, collect(), $own);
+        $lost = self::locksOut($user, $role, collect(), $own);
 
-            if ($lost->isNotEmpty()) {
-                return __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
-                    'permissions' => $lost->implode(', '),
-                ]);
-            }
+        if ($lost->isNotEmpty()) {
+            return __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [
+                'permissions' => $lost->implode(', '),
+            ]);
         }
 
         if (! self::deletesInUse() && ($inUse ?? self::roleInUse($role))) {
