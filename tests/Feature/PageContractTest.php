@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Tests\Feature;
 
+use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Tests\DefaultsTestCase;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
@@ -156,6 +157,70 @@ class PageContractTest extends DefaultsTestCase
         }
 
         $this->assertSame($few, $queries());
+    }
+
+    public function test_the_roles_list_does_not_query_per_own_role(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        $queries = function () use ($user): int {
+            // Once to warm up, as in the permissions list test above.
+            $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $rows = $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->assertOk()
+                ->json('props.dataTable.data');
+
+            // Every role on the page is the user's, so each one is weighed for a lock-out: the admin role
+            // would lock them out, the others only give view-roles, which admin keeps, and are in use.
+            $rows = collect($rows)->keyBy('name');
+            $this->assertTrue($rows->every(fn (array $row) => $row['can_manage']));
+            $this->assertStringStartsWith('You cannot delete this role: you would lose ', $rows['admin']['delete_refusal']);
+            $rows->except('admin')->each(fn (array $row) => $this->assertStringStartsWith('This role is assigned', $row['delete_refusal']));
+
+            return count(DB::getQueryLog());
+        };
+
+        $few = $queries();
+
+        foreach (range(1, 6) as $n) {
+            $role = Role::create(['name' => "own-{$n}", 'guard_name' => 'web']);
+            $role->givePermissionTo(Permission::findOrCreate('view-roles', 'web'));
+            $user->assignRole($role);
+        }
+
+        $this->assertSame($few, $queries());
+    }
+
+    public function test_the_delete_refusal_still_takes_the_ids_of_the_users_roles(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $spare = Role::create(['name' => 'spare', 'guard_name' => 'web']);
+        $user = $this->userWith()->assignRole($admin);
+
+        // The fourth parameter took the ids of the user's roles before it took an OwnAccess.
+        $this->assertStringStartsWith(
+            'You cannot delete this role: you would lose ',
+            (string) EscalationGuard::roleDeleteRefusal($user, $admin, false, collect([$admin->id])),
+        );
+        $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, false, collect([$admin->id])));
+        $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, inUse: false, ownRoleIds: collect([$admin->id])));
+    }
+
+    public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+        $own = EscalationGuard::ownAccess($user);
+
+        config(['roles-permissions-crud.prevent_privilege_escalation' => false]);
+
+        $this->assertTrue(EscalationGuard::locksOut($user, $admin, collect(), $own)->isEmpty());
     }
 
     public function test_the_list_offers_no_delete_that_would_lock_the_user_out(): void
