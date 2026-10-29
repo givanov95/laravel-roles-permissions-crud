@@ -7,7 +7,8 @@
   the delete would refuse with (protected, in use, or the user would lose access they need), or `null`
   when the delete would go through or the user may not manage the record. `RolesManager` and
   `PermissionsManager` show a refused Delete greyed out instead of hiding it, with the reason as its
-  hint and in a dialog on a click. Applications with their own lists can show the same hint instead of guessing the reason from
+  hint and in a dialog on a click. The dialog adds two strings to translate: `Cannot delete ":name"`
+  and `Close`. Applications with their own lists can show the same hint instead of guessing the reason from
   the counts, which said "in use" for the user's own role when `allow_delete_in_use` let deletes in use
   through and the delete was refused because it would lock them out.
 

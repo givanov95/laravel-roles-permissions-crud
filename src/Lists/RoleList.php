@@ -28,8 +28,9 @@ class RoleList extends ServerList
     private bool $mayManage = false;
 
     /**
-     * The roles the user has, the only ones whose delete could lock them out. Read only when a role in
-     * use may be deleted: otherwise the user's own roles are in use, and that refuses the delete first.
+     * The roles the user has, the only ones whose delete could lock them out. Read whenever escalation
+     * is prevented, as the delete checks a lock-out before whether the role is in use: the row's
+     * `delete_refusal` has to be the reason the delete gives.
      *
      * @var Collection<int, int|string>
      */
@@ -44,7 +45,7 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->ownRoleIds = EscalationGuard::deletesInUse() && $user instanceof Model && method_exists($user, 'roles')
+        $this->ownRoleIds = EscalationGuard::enabled() && $user instanceof Model && method_exists($user, 'roles')
             ? $user->roles()->pluck($user->roles()->getRelated()->getQualifiedKeyName())
             : collect();
     }

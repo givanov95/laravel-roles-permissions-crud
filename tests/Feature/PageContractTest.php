@@ -178,4 +178,18 @@ class PageContractTest extends DefaultsTestCase
         $this->assertNull($rows['spare']['delete_refusal']);
         $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.type', 'error');
     }
+
+    public function test_the_list_gives_the_reason_the_delete_gives_for_a_role_in_use_that_would_lock_the_user_out(): void
+    {
+        // Deletes in use are refused, but the delete checks the lock-out first and says that.
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        $refusal = $this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())
+            ->json('props.dataTable.data.0.delete_refusal');
+
+        $this->assertStringStartsWith('You cannot delete this role: you would lose ', $refusal);
+        $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.message', $refusal);
+    }
 }
