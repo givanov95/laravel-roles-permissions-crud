@@ -21,9 +21,12 @@
   `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`).
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
-  `aria-modal`, labelled by its title). Opening it moves the focus to its first button (Cancel, Close),
-  Tab stays inside it, Escape closes it, and closing it puts the focus back on the button that opened it.
-  Before, the focus stayed on the page behind the overlay and Escape did nothing.
+  `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).
+  Opening it moves the focus to its first button (Cancel, Close), Tab stays inside it, Escape closes it,
+  and closing it puts the focus back on the button that opened it. Before, the focus stayed on the page
+  behind the overlay and Escape did nothing. An Escape in the modal does not reach the app's own Escape
+  handlers (a drawer or dialog around the lists stays open), and the body's `overflow` is given back
+  as the app had it.
 
 ## v7.1.2
 
