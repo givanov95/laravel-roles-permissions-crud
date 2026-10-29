@@ -18,8 +18,7 @@
   queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
   refused). They are now read once, in `RoleList::prepare()`, and handed to
   `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
-  `roleDeleteRefusal()` still takes the ids of the user's roles in its place; its fourth parameter is
-  now named `$own`.
+  `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`).
 
 ## v7.1.2
 

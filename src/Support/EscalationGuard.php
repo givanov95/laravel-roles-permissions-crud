@@ -193,22 +193,23 @@ final class EscalationGuard
      * 403 of its own. The delete and the roles list both ask this, so the list offers Delete only when
      * the delete goes through.
      *
-     * For many roles, pass `$inUse` (from the list's counts) and `$own` ({@see ownAccess()}, read once for
-     * all of them): only the user's own roles can lock them out, and those are weighed without queries.
-     * The ids of the user's roles are still taken, as before `OwnAccess`: then the others skip the check,
-     * and the user's own ones read it each.
+     * For many roles, pass `$inUse` (from the list's counts) and `$ownRoleIds`: the user's
+     * {@see ownAccess()}, read once for all of them, as only the user's own roles can lock them out and
+     * those are then weighed without queries. It still takes the ids of the user's roles, as before
+     * `OwnAccess` (the name stays for callers that pass it by name): then the others skip the check,
+     * and the user's own ones read their access each.
      *
-     * @param  OwnAccess|Collection<int, int|string>|null  $own
+     * @param  OwnAccess|Collection<int, int|string>|null  $ownRoleIds
      */
-    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, OwnAccess|Collection|null $own = null): ?string
+    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, OwnAccess|Collection|null $ownRoleIds = null): ?string
     {
         if (self::isProtectedRole($role)) {
             return __('This role is protected and cannot be deleted.');
         }
 
-        if ($own instanceof Collection) {
-            $own = $own->contains($role->id) ? null : OwnAccess::none();
-        }
+        $own = $ownRoleIds instanceof Collection
+            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
+            : $ownRoleIds;
 
         $lost = self::locksOut($user, $role, collect(), $own);
 

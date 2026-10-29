@@ -208,6 +208,7 @@ class PageContractTest extends DefaultsTestCase
             (string) EscalationGuard::roleDeleteRefusal($user, $admin, false, collect([$admin->id])),
         );
         $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, false, collect([$admin->id])));
+        $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, inUse: false, ownRoleIds: collect([$admin->id])));
     }
 
     public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
