@@ -127,6 +127,10 @@ final class EscalationGuard
      */
     public static function locksOut(mixed $user, RoleContract $role, Collection $remaining, ?OwnAccess $own = null): Collection
     {
+        if (! self::enabled()) {
+            return collect();
+        }
+
         $own ??= self::ownAccess($user);
 
         if (! $own->includes($role)) {
@@ -191,11 +195,19 @@ final class EscalationGuard
      *
      * For many roles, pass `$inUse` (from the list's counts) and `$own` ({@see ownAccess()}, read once for
      * all of them): only the user's own roles can lock them out, and those are weighed without queries.
+     * The ids of the user's roles are still taken, as before `OwnAccess`: then the others skip the check,
+     * and the user's own ones read it each.
+     *
+     * @param  OwnAccess|Collection<int, int|string>|null  $own
      */
-    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, ?OwnAccess $own = null): ?string
+    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, OwnAccess|Collection|null $own = null): ?string
     {
         if (self::isProtectedRole($role)) {
             return __('This role is protected and cannot be deleted.');
+        }
+
+        if ($own instanceof Collection) {
+            $own = $own->contains($role->id) ? null : OwnAccess::none();
         }
 
         $lost = self::locksOut($user, $role, collect(), $own);

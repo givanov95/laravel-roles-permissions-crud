@@ -15,8 +15,11 @@
 ### Fixed
 - **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
   read their roles and permissions again to check whether deleting it would lock them out: three
-  queries a row. They are now read once, in `RoleList::prepare()`, and handed to
-  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess`.
+  queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
+  refused). They are now read once, in `RoleList::prepare()`, and handed to
+  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
+  `roleDeleteRefusal()` still takes the ids of the user's roles in its place; its fourth parameter is
+  now named `$own`.
 
 ## v7.1.2
 
