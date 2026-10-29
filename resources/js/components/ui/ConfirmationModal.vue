@@ -1,5 +1,6 @@
 <script lang="ts">
-// Module scope: one counter for every modal, so each title gets its own id.
+// Module scope: one counter for every modal, so each title gets its own id. Counted in the browser
+// only (on mount), since a server rendering many requests would count differently (SSR).
 let lastId = 0;
 
 const FOCUSABLE = [
@@ -24,7 +25,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const close = () => emit("close");
 
-const titleId = `rp-modal-title-${++lastId}`;
+const titleId = ref<string>();
 const panel = ref<HTMLElement | null>(null);
 
 /** The element that had focus when the modal opened (usually the button that opened it). */
@@ -34,9 +35,12 @@ const focusables = (): HTMLElement[] =>
     Array.from(panel.value?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
 
 // Escape closes; Tab and Shift+Tab go round the modal's own buttons instead of the page behind it.
+// Bound on the modal, not the document, so an Escape here does not also close a drawer or dialog of
+// the app around the lists.
 const onKeydown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         close();
         return;
     }
@@ -52,12 +56,14 @@ const onKeydown = (event: KeyboardEvent) => {
     const first = items[0];
     const last = items[items.length - 1];
     const active = document.activeElement;
-    const outside = !panel.value.contains(active);
+    // The panel itself has the focus after a click on its text (or when it has no buttons).
+    const atStart = active === first || active === panel.value || !panel.value.contains(active);
+    const atEnd = active === last || !panel.value.contains(active);
 
-    if (event.shiftKey && (active === first || outside)) {
+    if (event.shiftKey && atStart) {
         event.preventDefault();
         last.focus();
-    } else if (!event.shiftKey && (active === last || outside)) {
+    } else if (!event.shiftKey && atEnd) {
         event.preventDefault();
         first.focus();
     }
@@ -66,17 +72,19 @@ const onKeydown = (event: KeyboardEvent) => {
 const opened = () => {
     document.body.style.overflow = "hidden";
     opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    document.addEventListener("keydown", onKeydown);
     // The first button is the safe one (Cancel, Close); the panel itself when there is none.
     void nextTick(() => (focusables()[0] ?? panel.value)?.focus());
 };
 
 const closed = () => {
     document.body.style.overflow = "";
-    document.removeEventListener("keydown", onKeydown);
-    // Back to the button that opened it, unless it is gone (the deleted row's Delete).
-    if (opener?.isConnected) opener.focus();
+    const target = opener;
     opener = null;
+    // Back to the button that opened it, unless it is gone (the deleted row's Delete). After the
+    // render, since the page closing the modal may remove that row in the same update.
+    void nextTick(() => {
+        if (target?.isConnected) target.focus();
+    });
 };
 
 watch(
@@ -86,6 +94,7 @@ watch(
 
 // A modal mounted already open (and unmounted while open) opens and closes as well.
 onMounted(() => {
+    titleId.value = `rp-modal-title-${++lastId}`;
     if (props.show) opened();
 });
 onUnmounted(() => {
@@ -96,7 +105,7 @@ onUnmounted(() => {
 <template>
     <teleport to="body">
         <transition leave-active-class="duration-200">
-            <div v-show="show" class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0">
+            <div v-show="show" class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0" @keydown="onKeydown">
                 <transition
                     enter-active-class="ease-out duration-300"
                     enter-from-class="opacity-0"
