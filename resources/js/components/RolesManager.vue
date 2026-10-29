@@ -11,6 +11,7 @@ import SortableHeader from "./ui/SortableHeader.vue";
 import ConfirmationModal from "./ui/ConfirmationModal.vue";
 import DangerButton from "./ui/DangerButton.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
+import RefusedDeleteButton from "./ui/RefusedDeleteButton.vue";
 import SecondaryButton from "./ui/SecondaryButton.vue";
 
 interface Role {
@@ -32,10 +33,6 @@ interface Role {
 }
 
 const canDelete = (role: Role): boolean => role.can_delete ?? (!role.is_protected && role.can_manage);
-
-/** The reason to show on a Delete that is refused, or null when there is none to show. */
-const deleteRefusal = (role: Role): string | null =>
-    role.can_delete === false && typeof role.delete_refusal === "string" ? role.delete_refusal : null;
 
 const props = defineProps<{
     /** `RoleController::index()`: paged, searched and sorted on the server. */
@@ -141,15 +138,11 @@ const destroy = () => {
                             >
                                 {{ t('Delete') }}
                             </button>
-                            <button
-                                v-else-if="deleteRefusal(role)"
-                                type="button"
-                                aria-disabled="true"
-                                :title="deleteRefusal(role) as string"
-                                class="cursor-not-allowed rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-400"
-                            >
-                                {{ t('Delete') }}<span class="sr-only">: {{ deleteRefusal(role) }}</span>
-                            </button>
+                            <RefusedDeleteButton
+                                v-else-if="typeof role.delete_refusal === 'string'"
+                                :name="role.name"
+                                :reason="role.delete_refusal"
+                            />
                         </div>
                     </td>
                 </tr>

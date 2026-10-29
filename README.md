@@ -122,7 +122,8 @@ noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table
    than working the reason out from the counts, which cannot tell, for example, a role in use from
    one whose delete would lock the user out. The components read these from the page, so the shells
    do not forward them: they show Edit and Delete only where they lead somewhere, and a refused
-   Delete disabled, with the reason.
+   Delete greyed out, with the reason as its hint and in a dialog on a click (a hint alone does not
+   show on a touch screen or from the keyboard).
 
 ## Security
 

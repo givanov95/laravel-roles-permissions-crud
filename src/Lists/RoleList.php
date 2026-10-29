@@ -140,6 +140,8 @@ class RoleList extends ServerList
         $canManage = $this->mayManage
             && ! Models::sharedAcrossTeams($model)
             && EscalationGuard::canManageRole($user, $model, $this->held);
+        $users = (int) $model->getAttribute('users_count');
+        $others = (int) $model->getAttribute('others_count');
         // Why RoleController::destroy() would refuse it, so the list offers no Delete that ends in an error
         // and can say why. Users and others together are every assignment, as EscalationGuard::roleInUse()
         // counts them. (Inside a team they are the team's; a role with assignments in other teams is a
@@ -147,15 +149,15 @@ class RoleList extends ServerList
         $refusal = $canManage ? EscalationGuard::roleDeleteRefusal(
             $user,
             $model,
-            (int) $model->getAttribute('users_count') + (int) $model->getAttribute('others_count') > 0,
+            $users + $others > 0,
             $this->ownRoleIds,
         ) : null;
 
         return [
             'id'             => $model->getKey(),
             'name'           => $model->name,
-            'users_count'    => (int) $model->getAttribute('users_count'),
-            'others_count'   => (int) $model->getAttribute('others_count'),
+            'users_count'    => $users,
+            'others_count'   => $others,
             'permissions'    => $model->permissions->pluck('name')->values()->all(),
             'is_protected'   => EscalationGuard::isProtectedRole($model),
             'can_manage'     => $canManage,
