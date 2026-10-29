@@ -9,7 +9,7 @@ const FOCUSABLE = [
     "input:not([disabled]):not([type='hidden'])",
     "select:not([disabled])",
     "textarea:not([disabled])",
-    "[tabindex]:not([tabindex='-1'])",
+    "[tabindex]:not([tabindex='-1']):not([disabled])",
 ].join(",");
 
 /**
@@ -20,6 +20,9 @@ const FOCUSABLE = [
  * last one closes.
  */
 const openModals: Array<(event: KeyboardEvent) => void> = [];
+
+/** The body's own overflow before the first modal opened, given back when the last one closes. */
+let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
 </script>
@@ -43,15 +46,16 @@ const panel = ref<HTMLElement | null>(null);
 /** The element that had focus when the modal opened (usually the button that opened it). */
 let opener: HTMLElement | null = null;
 
-// Shown ones only: focus() does nothing on a button hidden with v-show.
+// Shown ones only: focus() does nothing on a button hidden with v-show or visibility.
 const focusables = (): HTMLElement[] =>
     Array.from(panel.value?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
-        (element) => element.getClientRects().length > 0,
+        (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden",
     );
 
 // Escape closes; Tab and Shift+Tab go round the modal's own buttons instead of the page behind it.
 const onKeydown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
+    // An Escape during an IME composition cancels the composition, not the modal.
+    if (event.key === "Escape" && !event.isComposing) {
         event.preventDefault();
         event.stopPropagation();
         close();
@@ -84,6 +88,7 @@ const onKeydown = (event: KeyboardEvent) => {
 const opened = () => {
     if (openModals.includes(onKeydown)) return;
     if (!openModals.length) {
+        bodyOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         window.addEventListener("keydown", onWindowKeydown, true);
     }
@@ -98,7 +103,7 @@ const closed = () => {
     if (index === -1) return;
     openModals.splice(index, 1);
     if (!openModals.length) {
-        document.body.style.overflow = "";
+        document.body.style.overflow = bodyOverflow;
         window.removeEventListener("keydown", onWindowKeydown, true);
     }
     const target = opener;
