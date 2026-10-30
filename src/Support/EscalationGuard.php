@@ -6,6 +6,7 @@ namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
@@ -161,18 +162,62 @@ final class EscalationGuard
      * Read from the database on every call, never remembered or taken from spatie's cache or the
      * user's loaded relations: a check that keeps the user from locking themselves out must weigh
      * what is stored now. A list reads it once for its page and passes it to each row, as nothing
-     * changes while the page is built; code that changes roles between checks should not.
+     * changes while the page is built; code that changes roles between checks should not. The roles
+     * list reads it only for a page with one of the user's roles that could lock them out (not
+     * protected, with a permission that guards the screens), which it tells by {@see ownRoleIds()},
+     * and passes `OwnAccess::none()` for the other rows.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {
-        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+        $own = self::ownQueries($user);
+
+        if ($own === null) {
             return OwnAccess::none();
         }
 
-        return new OwnAccess(
-            $user->roles()->where('guard_name', Models::guard())->with('permissions:id,name')->get(),
-            $user->permissions()->where('guard_name', Models::guard())->pluck('name'),
-        );
+        [$roles, $permissions] = $own;
+
+        return new OwnAccess($roles->with('permissions:id,name')->get(), $permissions->pluck('name'));
+    }
+
+    /**
+     * The ids of the roles {@see ownAccess()} reads, in one query: a list asks it whether a page has any
+     * of the user's roles before reading their access (three queries) for them. Read from the database,
+     * as `ownAccess()` is.
+     *
+     * @return Collection<int, int|string>
+     */
+    public static function ownRoleIds(mixed $user): Collection
+    {
+        $own = self::ownQueries($user);
+
+        if ($own === null) {
+            return collect();
+        }
+
+        [$roles] = $own;
+
+        return $roles->pluck($roles->getRelated()->getQualifiedKeyName());
+    }
+
+    /**
+     * The user's roles and direct permissions in the package's guard (spatie's relations, so inside a
+     * team the team's), or null when there is nothing to weigh. One place for {@see ownAccess()} and
+     * {@see ownRoleIds()}, so the two cannot disagree about which roles are the user's: a miss would
+     * skip the lock-out check.
+     *
+     * @return array{0: BelongsToMany<Model&RoleContract, Model>, 1: BelongsToMany<Model, Model>}|null
+     */
+    private static function ownQueries(mixed $user): ?array
+    {
+        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+            return null;
+        }
+
+        return [
+            $user->roles()->where('guard_name', Models::guard()),
+            $user->permissions()->where('guard_name', Models::guard()),
+        ];
     }
 
     /**
