@@ -9,8 +9,8 @@ use Spatie\Permission\Contracts\Role as RoleContract;
 
 /**
  * The roles a user has (with their permissions) and the permissions given to them directly, in the
- * package's guard: what {@see EscalationGuard::locksOut()} needs. A list reads it once for the page
- * instead of once for each of the user's roles in it.
+ * package's guard: what {@see EscalationGuard::locksOut()} needs. Read once per request
+ * ({@see EscalationGuard::ownAccess()}) instead of once for each of the user's roles that is checked.
  */
 final readonly class OwnAccess
 {
@@ -24,8 +24,7 @@ final readonly class OwnAccess
     ) {}
 
     /**
-     * Nothing to weigh: escalation is not prevented, the user has no roles of their own, or the list
-     * will not ask.
+     * Nothing to weigh: escalation is not prevented, or the user has no roles of their own.
      */
     public static function none(): self
     {

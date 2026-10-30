@@ -119,19 +119,19 @@ final class EscalationGuard
      * role, one of their own, ended up with only `$remaining` (none when it is deleted) and they hold
      * them through nothing else. Whoever manages access cannot lock themselves out of it.
      *
-     * Pass `$own` ({@see ownAccess()}) when checking many roles, so the user's roles and permissions
-     * are read once.
+     * The user's roles and permissions are read once per request ({@see ownAccess()}), so checking
+     * many roles costs no queries for each.
      *
      * @param  Collection<int, int>  $remaining
      * @return Collection<int, string>
      */
-    public static function locksOut(mixed $user, RoleContract $role, Collection $remaining, ?OwnAccess $own = null): Collection
+    public static function locksOut(mixed $user, RoleContract $role, Collection $remaining): Collection
     {
         if (! self::enabled()) {
             return collect();
         }
 
-        $own ??= self::ownAccess($user);
+        $own = self::ownAccess($user);
 
         if (! $own->includes($role)) {
             return collect();
@@ -154,6 +154,11 @@ final class EscalationGuard
      * The user's roles (with their permissions) and direct permissions in the package's guard, which
      * {@see locksOut()} weighs. None when escalation is not prevented or the user has no roles and
      * permissions of their own (no HasRoles).
+     *
+     * Remembered for the request (and the queue job), as {@see held()} is: the delete, the role form and
+     * every row of a list ask. Nothing in the package asks again after changing them in the same request
+     * (the checks come before the change, and a redirect follows it); code that changes the user's roles
+     * and then asks again in the same request reads what was there before.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {
@@ -161,9 +166,23 @@ final class EscalationGuard
             return OwnAccess::none();
         }
 
-        return new OwnAccess(
+        $resolve = fn (): OwnAccess => new OwnAccess(
             $user->roles()->where('guard_name', Models::guard())->with('permissions:id,name')->get(),
             $user->permissions()->where('guard_name', Models::guard())->pluck('name'),
+        );
+
+        // Remembered only for a stored user, as held() is. The team is part of the key: the roles are
+        // read for the current team, which the application may change during the request.
+        if ($user->getKey() === null) {
+            return $resolve();
+        }
+
+        $team = Models::teams() ? (string) Models::team() : '';
+
+        return app(HeldPermissions::class)->remember(
+            app('request'),
+            'own:'.$team.':'.$user->getMorphClass().':'.$user->getKey(),
+            $resolve,
         );
     }
 
@@ -193,25 +212,21 @@ final class EscalationGuard
      * 403 of its own. The delete and the roles list both ask this, so the list offers Delete only when
      * the delete goes through.
      *
-     * For many roles, pass `$inUse` (from the list's counts) and `$ownRoleIds`: the user's
-     * {@see ownAccess()}, read once for all of them, as only the user's own roles can lock them out and
-     * those are then weighed without queries. It still takes the ids of the user's roles, as before
-     * `OwnAccess` (the name stays for callers that pass it by name): then the others skip the check,
-     * and the user's own ones read their access each.
+     * For many roles, pass `$inUse` (from the list's counts). The user's own roles and permissions are
+     * read once per request ({@see ownAccess()}), so `$ownRoleIds` (the ids of the roles the user has)
+     * is no longer needed for speed; when given, a role outside it skips the lock-out check.
      *
-     * @param  OwnAccess|Collection<int, int|string>|null  $ownRoleIds
+     * @param  Collection<int, int|string>|null  $ownRoleIds
      */
-    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, OwnAccess|Collection|null $ownRoleIds = null): ?string
+    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, ?Collection $ownRoleIds = null): ?string
     {
         if (self::isProtectedRole($role)) {
             return __('This role is protected and cannot be deleted.');
         }
 
-        $own = $ownRoleIds instanceof Collection
-            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
-            : $ownRoleIds;
-
-        $lost = self::locksOut($user, $role, collect(), $own);
+        $lost = $ownRoleIds === null || $ownRoleIds->contains($role->id)
+            ? self::locksOut($user, $role, collect())
+            : collect();
 
         if ($lost->isNotEmpty()) {
             return __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [

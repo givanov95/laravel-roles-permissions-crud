@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Tests\Feature;
 
+use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Tests\Fixtures\User;
 use Givanov95\RolesPermissionsCrud\Tests\TestCase;
 use Illuminate\Support\Facades\DB;
@@ -161,7 +162,30 @@ class TeamsTest extends TestCase
         $this->getJson(route('admin.roles.index'), ['X-Inertia' => 'true'])->assertJsonPath('props.dataTable.data.0.users_count', 3);
     }
 
-    public function test_a_global_role_name_is_checked_against_every_team(): void
+    public function test_the_users_own_roles_are_read_for_the_current_team(): void
+    {
+        $editor = $this->role('editor', 1);
+        $reviewer = $this->role('reviewer', 2);
+        config(['roles-permissions-crud.prevent_privilege_escalation' => true]);
+        // Only the pivot is read, so the user needs no row of its own (there is no users table here).
+        $user = (new User)->forceFill(['id' => 7]);
+        $user->exists = true;
+
+        foreach ([[$editor, 1], [$reviewer, 2]] as [$role, $team]) {
+            DB::table('model_has_roles')->insert(['role_id' => $role->id, 'model_type' => User::class, 'model_id' => $user->id, 'team_id' => $team]);
+        }
+
+        // The roles are remembered for the request, but not across a change of team in it.
+        setPermissionsTeamId(1);
+        $this->assertTrue(EscalationGuard::ownAccess($user)->includes($editor));
+        $this->assertFalse(EscalationGuard::ownAccess($user)->includes($reviewer));
+
+        setPermissionsTeamId(2);
+        $this->assertTrue(EscalationGuard::ownAccess($user)->includes($reviewer));
+        $this->assertFalse(EscalationGuard::ownAccess($user)->includes($editor));
+    }
+
+        public function test_a_global_role_name_is_checked_against_every_team(): void
     {
         $this->role('editor', 1);
         $global = $this->role('admin', null);

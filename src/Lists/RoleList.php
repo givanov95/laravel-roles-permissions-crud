@@ -8,7 +8,6 @@ use Givanov95\DataTable\DataTable;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
-use Givanov95\RolesPermissionsCrud\Support\OwnAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -28,14 +27,6 @@ class RoleList extends ServerList
 
     private bool $mayManage = false;
 
-    /**
-     * The user's roles and permissions, read once for the page: only their own roles can lock them
-     * out. Read whenever escalation is prevented and the user may manage roles (otherwise no row asks),
-     * as the delete checks a lock-out before whether the role is in use: the row's `delete_refusal`
-     * has to be the reason the delete gives.
-     */
-    private OwnAccess $own;
-
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
 
@@ -45,7 +36,6 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->own = $this->mayManage ? EscalationGuard::ownAccess($user) : OwnAccess::none();
     }
 
     protected function table(Request $request): DataTable
@@ -145,12 +135,8 @@ class RoleList extends ServerList
         // and can say why. Users and others together are every assignment, as EscalationGuard::roleInUse()
         // counts them. (Inside a team they are the team's; a role with assignments in other teams is a
         // global one, read-only there anyway.) Not asked when the user cannot manage it: that is a 403.
-        $refusal = $canManage ? EscalationGuard::roleDeleteRefusal(
-            $user,
-            $model,
-            $users + $others > 0,
-            $this->own,
-        ) : null;
+        // The user's own roles, which the lock-out check weighs, are read once for the request.
+        $refusal = $canManage ? EscalationGuard::roleDeleteRefusal($user, $model, $users + $others > 0) : null;
 
         return [
             'id'             => $model->getKey(),

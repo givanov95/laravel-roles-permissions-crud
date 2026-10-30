@@ -13,12 +13,13 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
-- **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
-  read their roles and permissions again to check whether deleting it would lock them out: three
-  queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
-  refused). They are now read once, in `RoleList::prepare()`, and handed to
-  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
-  `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`).
+- **The user's own roles are read once per request.** Each of the user's roles on the roles list read
+  their roles and permissions again to check whether deleting it would lock them out: three queries a
+  row (with `allow_delete_in_use`, and with every config since the rows say why a delete is refused).
+  `EscalationGuard::locksOut()` now remembers them for the request (and the queue job), as it does
+  what the user holds, so the list, the delete, the role form and an application's own list that
+  passes `$ownRoleIds` to `roleDeleteRefusal()` all read them once. The signatures stay as in v7.1.2;
+  `$ownRoleIds` is no longer needed for speed. With spatie's teams they are read for the current team.
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
   `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).
