@@ -23,6 +23,13 @@
   to read them once. Outside a list they are still read from the database for every check, never
   remembered for the request or taken from spatie's cache: a role deleted or taken away earlier in
   the same request is seen, so a loop of deletes cannot lock the user out.
+- **What the user holds is remembered for each team and guard.** `EscalationGuard::held()` remembered
+  it for the request by user alone, so an application that switched teams (`setPermissionsTeamId()`)
+  or the package's guard during a request got what the user held before the switch: the role form
+  offered the wrong permissions and a role could be judged within or beyond the user wrongly.
+- **The lock-out check matches the user's roles by id whatever its type.** A role passed with a string
+  id (a role class with string keys) was not found among the user's roles, which come with int ids,
+  so the check was skipped and the delete went through.
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
   `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).

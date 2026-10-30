@@ -279,6 +279,28 @@ class PageContractTest extends DefaultsTestCase
         $this->assertTrue($refused($user, $second));
     }
 
+    public function test_the_lock_out_check_matches_a_role_whose_id_comes_as_a_string(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        // The same role from a model with string keys (as an application's own role class may have):
+        // Eloquent casts an int key back to an int, a string key stays a string.
+        $stringly = new class extends Role
+        {
+            protected $keyType = 'string';
+
+            public $incrementing = false;
+        };
+        $stringly->setRawAttributes(['id' => (string) $admin->id, 'name' => 'admin', 'guard_name' => 'web'], true);
+        $stringly->setRelation('permissions', $admin->permissions);
+        $this->assertSame((string) $admin->id, $stringly->getKey());
+
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $stringly, collect())->all());
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $stringly, collect(), EscalationGuard::ownAccess($user))->all());
+    }
+
     public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
     {
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);

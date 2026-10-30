@@ -34,6 +34,28 @@ final readonly class OwnAccess
 
     public function includes(RoleContract $role): bool
     {
-        return $this->roles->contains(fn (RoleContract $own) => $own->getKey() === $role->getKey());
+        return $this->roles->contains(fn (RoleContract $own) => self::same($own, $role));
+    }
+
+    /**
+     * The names of the permissions the user holds other than through the role: directly or through
+     * their other roles.
+     *
+     * @return Collection<int, string>
+     */
+    public function heldWithout(RoleContract $role): Collection
+    {
+        return $this->direct->merge($this->roles
+            ->reject(fn (RoleContract $own) => self::same($own, $role))
+            ->flatMap(fn (RoleContract $own) => $own->permissions->pluck('name')));
+    }
+
+    /**
+     * Keys compared as strings: the same id may come as an int from one source and a string from
+     * another, and a miss here would skip the lock-out check.
+     */
+    private static function same(RoleContract $one, RoleContract $other): bool
+    {
+        return (string) $one->getKey() === (string) $other->getKey();
     }
 }

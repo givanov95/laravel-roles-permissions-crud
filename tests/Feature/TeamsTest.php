@@ -194,6 +194,28 @@ class TeamsTest extends TestCase
         $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $reviewer, collect())->all());
     }
 
+    public function test_what_the_user_holds_is_remembered_for_each_team(): void
+    {
+        $this->role('editor', 1)->givePermissionTo(Permission::findOrCreate('posts.edit', 'web'));
+        $this->role('reviewer', 2)->givePermissionTo(Permission::findOrCreate('posts.review', 'web'));
+        // Only the pivot is read, so the user needs no row of its own (there is no users table here).
+        $user = (new User)->forceFill(['id' => 7]);
+        $user->exists = true;
+
+        foreach ([['editor', 1], ['reviewer', 2]] as [$name, $team]) {
+            DB::table('model_has_roles')->insert(['role_id' => Role::where('name', $name)->value('id'), 'model_type' => User::class, 'model_id' => $user->id, 'team_id' => $team]);
+        }
+        $names = fn (): array => Permission::whereIn('id', EscalationGuard::held($user))->pluck('name')->all();
+
+        setPermissionsTeamId(1);
+        $this->assertSame(['posts.edit'], $names());
+
+        // A switch of team in the same request, with the user's roles read again as spatie asks.
+        setPermissionsTeamId(2);
+        $user->unsetRelation('roles');
+        $this->assertSame(['posts.review'], $names());
+    }
+
     public function test_a_global_role_name_is_checked_against_every_team(): void
     {
         $this->role('editor', 1);

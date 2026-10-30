@@ -50,7 +50,11 @@ final class EscalationGuard
             return $resolve();
         }
 
-        return app(HeldPermissions::class)->remember(app('request'), $user->getMorphClass().':'.$user->getKey(), $resolve);
+        // The guard and the team are part of the key: what the user holds depends on both, and the
+        // application may change either during the request.
+        $key = implode(':', [Models::guard(), Models::teams() ? (string) Models::team() : '', $user->getMorphClass(), $user->getKey()]);
+
+        return app(HeldPermissions::class)->remember(app('request'), $key, $resolve);
     }
 
     /**
@@ -138,9 +142,7 @@ final class EscalationGuard
             return collect();
         }
 
-        $elsewhere = $own->direct->merge($own->roles->reject(
-            fn (RoleContract $other) => $other->getKey() === $role->getKey()
-        )->flatMap(fn (RoleContract $other) => $other->permissions->pluck('name')));
+        $elsewhere = $own->heldWithout($role);
 
         return $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
