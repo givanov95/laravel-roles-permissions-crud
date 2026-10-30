@@ -164,9 +164,13 @@ class TeamsTest extends TestCase
 
     public function test_the_users_own_roles_are_read_for_the_current_team(): void
     {
-        config(['roles-permissions-crud.prevent_privilege_escalation' => true]);
-        $editor = $this->role('editor', 1);
-        $reviewer = $this->role('reviewer', 2);
+        config([
+            'roles-permissions-crud.prevent_privilege_escalation' => true,
+            'roles-permissions-crud.authorize_permissions.roles' => ['view' => 'view-roles', 'manage' => 'manage-roles'],
+        ]);
+        $manage = Permission::findOrCreate('manage-roles', 'web');
+        $editor = $this->role('editor', 1)->givePermissionTo($manage);
+        $reviewer = $this->role('reviewer', 2)->givePermissionTo($manage);
         // Only the pivot is read, so the user needs no row of its own (there is no users table here).
         $user = (new User)->forceFill(['id' => 7]);
         $user->exists = true;
@@ -175,14 +179,19 @@ class TeamsTest extends TestCase
             DB::table('model_has_roles')->insert(['role_id' => $role->id, 'model_type' => User::class, 'model_id' => $user->id, 'team_id' => $team]);
         }
 
+        // In team 1 only the editor role is the user's: deleting it would take manage-roles away, and the
+        // reviewer role of team 2, which gives it too, does not count.
         setPermissionsTeamId(1);
         $this->assertTrue(EscalationGuard::ownAccess($user)->includes($editor));
         $this->assertFalse(EscalationGuard::ownAccess($user)->includes($reviewer));
+        $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $editor, collect())->all());
+        $this->assertSame([], EscalationGuard::locksOut($user, $reviewer, collect())->all());
 
         // Read again, not remembered: a switch of team in the request is seen.
         setPermissionsTeamId(2);
         $this->assertTrue(EscalationGuard::ownAccess($user)->includes($reviewer));
         $this->assertFalse(EscalationGuard::ownAccess($user)->includes($editor));
+        $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $reviewer, collect())->all());
     }
 
     public function test_a_global_role_name_is_checked_against_every_team(): void
