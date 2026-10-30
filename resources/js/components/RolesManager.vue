@@ -56,8 +56,9 @@ const deleting = ref(false);
 
 const closeModal = () => {
     if (deleting.value) return;
+    // The form is not reset: the fading modal would read `delete ""`, and the next confirmDelete
+    // fills it again anyway.
     showDeleteModal.value = false;
-    deleteForm.reset();
 };
 
 const destroy = () => {
@@ -174,10 +175,11 @@ const destroy = () => {
             </template>
             <template #footer>
                 <!-- aria-disabled, not disabled: the focused button keeps the focus while the delete runs
-                     (a disabled one drops it to the body); closeModal and destroy ignore the click. -->
+                     (a disabled one drops it to the body); closeModal and destroy ignore a key press.
+                     No pointer events, so the buttons do not light up on hover or press either. -->
                 <SecondaryButton
                     :aria-disabled="deleting || undefined"
-                    :class="{ 'cursor-not-allowed opacity-25': deleting }"
+                    :class="{ 'pointer-events-none opacity-25': deleting }"
                     @click="closeModal"
                 >
                     {{ t('Cancel') }}
@@ -185,7 +187,7 @@ const destroy = () => {
                 <DangerButton
                     class="ms-3"
                     :aria-disabled="deleting || undefined"
-                    :class="{ 'cursor-not-allowed opacity-25': deleting }"
+                    :class="{ 'pointer-events-none opacity-25': deleting }"
                     @click="destroy"
                 >
                     {{ t('Delete') }}

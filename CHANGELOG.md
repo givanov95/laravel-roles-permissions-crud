@@ -13,6 +13,12 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **The delete confirmation stays locked while the delete runs.** `RolesManager` and `PermissionsManager`
+  locked Delete on a form the request never used, so it stayed active: a second click sent a second
+  request, and Escape, the overlay or Cancel closed the dialog mid-request (the request then closed a
+  confirmation opened for another row). Delete and Cancel are now inactive until the request ends
+  (`aria-disabled`, so the keyboard focus stays on the button), the dialog does not close before then,
+  and a second click sends nothing.
 - **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
   read their roles and permissions again to check whether deleting it would lock them out: three
   queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
