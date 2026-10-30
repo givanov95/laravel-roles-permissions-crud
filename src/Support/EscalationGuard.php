@@ -163,8 +163,9 @@ final class EscalationGuard
      * user's loaded relations: a check that keeps the user from locking themselves out must weigh
      * what is stored now. A list reads it once for its page and passes it to each row, as nothing
      * changes while the page is built; code that changes roles between checks should not. The roles
-     * list reads it only for a page with one of the user's roles, which it tells by
-     * {@see ownRoleIds()}, and passes `OwnAccess::none()` for the other rows.
+     * list reads it only for a page with one of the user's roles that could lock them out (not
+     * protected, with a permission that guards the screens), which it tells by {@see ownRoleIds()},
+     * and passes `OwnAccess::none()` for the other rows.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {

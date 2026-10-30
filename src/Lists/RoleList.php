@@ -30,7 +30,8 @@ class RoleList extends ServerList
 
     /**
      * The ids of the user's roles, the only ones whose delete could lock them out: read at the first row
-     * the user may manage (one query), as the delete checks a lock-out before whether the role is in
+     * the user may manage whose role could lock someone out (not protected, with a permission that
+     * guards the screens), in one query, as the delete checks a lock-out before whether the role is in
      * use and the row's `delete_refusal` has to be the reason the delete gives.
      *
      * @var Collection<int, int|string>|null
@@ -39,7 +40,8 @@ class RoleList extends ServerList
 
     /**
      * The user's roles and permissions, read once for the page at the first of their own roles on it
-     * (three queries), so a page without one (another page, a search) does not read them.
+     * that could lock them out (three queries), so a page without one (another page, a search) does
+     * not read them.
      */
     private ?OwnAccess $own = null;
 
