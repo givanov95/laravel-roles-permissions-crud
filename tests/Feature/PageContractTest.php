@@ -211,6 +211,96 @@ class PageContractTest extends DefaultsTestCase
         $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, inUse: false, ownRoleIds: collect([$admin->id])));
     }
 
+    public function test_an_applications_list_that_passes_own_access_does_not_query_per_own_role(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        // An application's own list: the user's access read once for the page, then every row.
+        $queries = function () use ($user): int {
+            $roles = Role::with('permissions')->get();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $own = EscalationGuard::ownAccess($user);
+            $refusals = $roles->map(fn (Role $role) => EscalationGuard::roleDeleteRefusal($user, $role, false, $own));
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            $this->assertStringStartsWith('You cannot delete this role: you would lose ', (string) $refusals->first());
+            $this->assertTrue($refusals->slice(1)->every(fn (?string $refusal) => $refusal === null));
+
+            return $count;
+        };
+
+        $few = $queries();
+
+        foreach (range(1, 6) as $n) {
+            $role = Role::create(['name' => "own-{$n}", 'guard_name' => 'web']);
+            $role->givePermissionTo(Permission::findOrCreate('view-roles', 'web'));
+            $user->assignRole($role);
+        }
+
+        $this->assertSame($few, $queries());
+    }
+
+    public function test_a_change_made_earlier_in_the_request_is_seen_by_the_next_check(): void
+    {
+        // Two roles that each give the user what they need to manage access: either one may go, not both.
+        $setUp = function (): array {
+            $permissions = [Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web')];
+            $first = Role::create(['name' => uniqid('first'), 'guard_name' => 'web'])->givePermissionTo(...$permissions);
+            $second = Role::create(['name' => uniqid('second'), 'guard_name' => 'web'])->givePermissionTo(...$permissions);
+
+            return [$this->userWith()->assignRole($first, $second), $first, $second];
+        };
+        $refused = fn ($user, Role $role): bool => str_starts_with(
+            (string) EscalationGuard::roleDeleteRefusal($user, $role, false),
+            'You cannot delete this role: you would lose ',
+        );
+
+        // An application deleting roles in a loop, with the same user, in one request.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $first->delete();
+        $this->assertTrue($refused($user, $second));
+
+        // The same after taking the first role away from the user.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $user->removeRole($first);
+        $this->assertTrue($refused($user, $second));
+
+        // And after emptying the first role.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $first->syncPermissions([]);
+        $this->assertTrue($refused($user, $second));
+    }
+
+    public function test_the_lock_out_check_matches_a_role_whose_id_comes_as_a_string(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+
+        // The same role from a model with string keys (as an application's own role class may have):
+        // Eloquent casts an int key back to an int, a string key stays a string.
+        $stringly = new class extends Role
+        {
+            protected $keyType = 'string';
+
+            public $incrementing = false;
+        };
+        $stringly->setRawAttributes(['id' => (string) $admin->id, 'name' => 'admin', 'guard_name' => 'web'], true);
+        $stringly->setRelation('permissions', $admin->permissions);
+        $this->assertSame((string) $admin->id, $stringly->getKey());
+
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $stringly, collect())->all());
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $stringly, collect(), EscalationGuard::ownAccess($user))->all());
+    }
+
     public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
     {
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);

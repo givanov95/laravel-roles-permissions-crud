@@ -18,7 +18,18 @@
   queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
   refused). They are now read once, in `RoleList::prepare()`, and handed to
   `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
-  `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`).
+  `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`), which
+  reads them for each of the user's own roles; an application's own list passes `ownAccess()` instead
+  to read them once. Outside a list they are still read from the database for every check, never
+  remembered for the request or taken from spatie's cache: a role deleted or taken away earlier in
+  the same request is seen, so a loop of deletes cannot lock the user out.
+- **What the user holds is remembered for each team and guard.** `EscalationGuard::held()` remembered
+  it for the request by user alone, so an application that switched teams (`setPermissionsTeamId()`)
+  or the package's guard during a request got what the user held before the switch: the role form
+  offered the wrong permissions and a role could be judged within or beyond the user wrongly.
+- **The lock-out check matches the user's roles by id whatever its type.** A role passed with a string
+  id (a role class with string keys) was not found among the user's roles, which come with int ids,
+  so the check was skipped and the delete went through.
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
   `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).

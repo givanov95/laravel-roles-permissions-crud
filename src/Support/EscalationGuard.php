@@ -50,7 +50,11 @@ final class EscalationGuard
             return $resolve();
         }
 
-        return app(HeldPermissions::class)->remember(app('request'), $user->getMorphClass().':'.$user->getKey(), $resolve);
+        // The guard and the team are part of the key: what the user holds depends on both, and the
+        // application may change either during the request.
+        $key = implode(':', [Models::guard(), Models::teams() ? (string) Models::team() : '', $user->getMorphClass(), $user->getKey()]);
+
+        return app(HeldPermissions::class)->remember(app('request'), $key, $resolve);
     }
 
     /**
@@ -120,7 +124,8 @@ final class EscalationGuard
      * them through nothing else. Whoever manages access cannot lock themselves out of it.
      *
      * Pass `$own` ({@see ownAccess()}) when checking many roles, so the user's roles and permissions
-     * are read once.
+     * are read once. Without it they are read from the database for this check, so a change made
+     * earlier in the request is seen.
      *
      * @param  Collection<int, int>  $remaining
      * @return Collection<int, string>
@@ -137,9 +142,7 @@ final class EscalationGuard
             return collect();
         }
 
-        $elsewhere = $own->direct->merge($own->roles->reject(
-            fn (RoleContract $other) => $other->getKey() === $role->getKey()
-        )->flatMap(fn (RoleContract $other) => $other->permissions->pluck('name')));
+        $elsewhere = $own->heldWithout($role);
 
         return $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
@@ -154,6 +157,11 @@ final class EscalationGuard
      * The user's roles (with their permissions) and direct permissions in the package's guard, which
      * {@see locksOut()} weighs. None when escalation is not prevented or the user has no roles and
      * permissions of their own (no HasRoles).
+     *
+     * Read from the database on every call, never remembered or taken from spatie's cache or the
+     * user's loaded relations: a check that keeps the user from locking themselves out must weigh
+     * what is stored now. A list reads it once for its page and passes it to each row, as nothing
+     * changes while the page is built; code that changes roles between checks should not.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {
@@ -197,7 +205,8 @@ final class EscalationGuard
      * {@see ownAccess()}, read once for all of them, as only the user's own roles can lock them out and
      * those are then weighed without queries. It still takes the ids of the user's roles, as before
      * `OwnAccess` (the name stays for callers that pass it by name): then the others skip the check,
-     * and the user's own ones read their access each.
+     * and the user's own ones read their access each. An application's own list that passed the ids
+     * passes `ownAccess()` instead to read it once.
      *
      * @param  OwnAccess|Collection<int, int|string>|null  $ownRoleIds
      */
