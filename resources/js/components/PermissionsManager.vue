@@ -52,15 +52,28 @@ const confirmDelete = (permission: Permission) => {
     showDeleteModal.value = true;
 };
 
+/** Set while a delete is on its way: the modal stays open (and its form kept) until it is done. */
+const deleting = ref(false);
+
 const closeModal = () => {
+    if (deleting.value) return;
     showDeleteModal.value = false;
     deleteForm.reset();
 };
 
 const destroy = () => {
+    if (deleting.value) return;
+    // `router.delete` does not set `deleteForm.processing`, so the modal keeps its own flag. Set in
+    // `onStart`, which Inertia calls only for a visit that goes ahead (not one a `before` listener stops).
     router.delete(r("permissions.destroy", deleteForm.id as number) as string, {
         preserveScroll: true,
-        onFinish: closeModal,
+        onStart: () => {
+            deleting.value = true;
+        },
+        onFinish: () => {
+            deleting.value = false;
+            closeModal();
+        },
     });
 };
 </script>
@@ -148,11 +161,11 @@ const destroy = () => {
                 {{ t('Are you sure you want to delete') }} "{{ deleteForm.name }}"?
             </template>
             <template #footer>
-                <SecondaryButton @click="closeModal">{{ t('Cancel') }}</SecondaryButton>
+                <SecondaryButton :disabled="deleting" @click="closeModal">{{ t('Cancel') }}</SecondaryButton>
                 <DangerButton
                     class="ms-3"
-                    :class="{ 'opacity-25': deleteForm.processing }"
-                    :disabled="deleteForm.processing"
+                    :class="{ 'opacity-25': deleting }"
+                    :disabled="deleting"
                     @click="destroy"
                 >
                     {{ t('Delete') }}
