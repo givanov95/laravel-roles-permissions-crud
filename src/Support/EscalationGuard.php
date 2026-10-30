@@ -10,7 +10,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
-use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Keeps whoever may manage roles from handing out more than they hold, changing a role that is
@@ -120,37 +119,28 @@ final class EscalationGuard
      * role, one of their own, ended up with only `$remaining` (none when it is deleted) and they hold
      * them through nothing else. Whoever manages access cannot lock themselves out of it.
      *
-     * Read from where spatie's own checks read: the user's `roles` and `permissions` relations, which
-     * spatie loads once and resets when it assigns, removes, gives or revokes, and spatie's cached
-     * permissions with their roles, which it resets when a role or permission changes. So checking many
-     * roles costs no queries for each, and a change made through spatie is seen by the next check.
+     * Pass `$own` ({@see ownAccess()}) when checking many roles, so the user's roles and permissions
+     * are read once. Without it they are read from the database for this check, so a change made
+     * earlier in the request is seen.
      *
      * @param  Collection<int, int>  $remaining
      * @return Collection<int, string>
      */
-    public static function locksOut(mixed $user, RoleContract $role, Collection $remaining): Collection
+    public static function locksOut(mixed $user, RoleContract $role, Collection $remaining, ?OwnAccess $own = null): Collection
     {
-        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+        if (! self::enabled()) {
             return collect();
         }
 
-        $own = self::inGuard($user->getRelationValue('roles'));
+        $own ??= self::ownAccess($user);
 
-        // Keys compared as strings: spatie's cache may give back an id of another type than the query.
-        $isRole = fn (Model $other): bool => (string) $other->getKey() === (string) $role->getKey();
-
-        if (! $own->contains($isRole)) {
+        if (! $own->includes($role)) {
             return collect();
         }
 
-        $others = $own->reject($isRole)->map(fn (Model $other): string => (string) $other->getKey());
-
-        $elsewhere = self::inGuard(app(PermissionRegistrar::class)->getPermissions())
-            ->filter(fn (Model $permission) => $permission->getRelationValue('roles')->contains(
-                fn (Model $holder) => $others->contains((string) $holder->getKey())
-            ))
-            ->merge(self::inGuard($user->getRelationValue('permissions')))
-            ->map(fn (Model $permission) => $permission->getAttribute('name'));
+        $elsewhere = $own->direct->merge($own->roles->reject(
+            fn (RoleContract $other) => $other->getKey() === $role->getKey()
+        )->flatMap(fn (RoleContract $other) => $other->permissions->pluck('name')));
 
         return $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
@@ -162,16 +152,25 @@ final class EscalationGuard
     }
 
     /**
-     * The roles or permissions of the package's guard.
+     * The user's roles (with their permissions) and direct permissions in the package's guard, which
+     * {@see locksOut()} weighs. None when escalation is not prevented or the user has no roles and
+     * permissions of their own (no HasRoles).
      *
-     * @param  iterable<Model>|null  $models
-     * @return Collection<int, Model>
+     * Read from the database on every call, never remembered or taken from spatie's cache or the
+     * user's loaded relations: a check that keeps the user from locking themselves out must weigh
+     * what is stored now. A list reads it once for its page and passes it to each row, as nothing
+     * changes while the page is built; code that changes roles between checks should not.
      */
-    private static function inGuard(?iterable $models): Collection
+    public static function ownAccess(mixed $user): OwnAccess
     {
-        return collect($models ?? [])
-            ->filter(fn (Model $model) => $model->getAttribute('guard_name') === Models::guard())
-            ->values();
+        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+            return OwnAccess::none();
+        }
+
+        return new OwnAccess(
+            $user->roles()->where('guard_name', Models::guard())->with('permissions:id,name')->get(),
+            $user->permissions()->where('guard_name', Models::guard())->pluck('name'),
+        );
     }
 
     /**
@@ -200,21 +199,26 @@ final class EscalationGuard
      * 403 of its own. The delete and the roles list both ask this, so the list offers Delete only when
      * the delete goes through.
      *
-     * For many roles, pass `$inUse` (from the list's counts). `$ownRoleIds` (the ids of the roles the
-     * user has) is no longer needed for speed, as {@see locksOut()} reads no rows of its own; when
-     * given, a role outside it skips the lock-out check.
+     * For many roles, pass `$inUse` (from the list's counts) and `$ownRoleIds`: the user's
+     * {@see ownAccess()}, read once for all of them, as only the user's own roles can lock them out and
+     * those are then weighed without queries. It still takes the ids of the user's roles, as before
+     * `OwnAccess` (the name stays for callers that pass it by name): then the others skip the check,
+     * and the user's own ones read their access each. An application's own list that passed the ids
+     * passes `ownAccess()` instead to read it once.
      *
-     * @param  Collection<int, int|string>|null  $ownRoleIds
+     * @param  OwnAccess|Collection<int, int|string>|null  $ownRoleIds
      */
-    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, ?Collection $ownRoleIds = null): ?string
+    public static function roleDeleteRefusal(mixed $user, RoleContract $role, ?bool $inUse = null, OwnAccess|Collection|null $ownRoleIds = null): ?string
     {
         if (self::isProtectedRole($role)) {
             return __('This role is protected and cannot be deleted.');
         }
 
-        $lost = $ownRoleIds === null || $ownRoleIds->contains($role->id)
-            ? self::locksOut($user, $role, collect())
-            : collect();
+        $own = $ownRoleIds instanceof Collection
+            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
+            : $ownRoleIds;
+
+        $lost = self::locksOut($user, $role, collect(), $own);
 
         if ($lost->isNotEmpty()) {
             return __('You cannot delete this role: you would lose :permissions, which you need to manage access.', [

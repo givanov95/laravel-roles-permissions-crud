@@ -13,16 +13,16 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
-- **The lock-out check reads no rows of its own.** Each of the user's roles on the roles list read
-  their roles and permissions again to check whether deleting it would lock them out: three queries a
-  row (with `allow_delete_in_use`, and with every config since the rows say why a delete is refused),
-  and the same in the delete, the role form and an application's own list that passes `$ownRoleIds`
-  to `roleDeleteRefusal()`. `EscalationGuard::locksOut()` now reads what spatie's own checks read:
-  the user's `roles` and `permissions` relations and spatie's cached permissions with their roles.
-  Spatie resets them when it changes roles, permissions or the user's assignments, so a check after
-  such a change in the same request sees it. A change made around spatie (straight in the database,
-  or on another instance of the user) needs `forgetCachedPermissions()` or `unsetRelation('roles')`,
-  as spatie's `can()` does. The signatures stay as in v7.1.2.
+- **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
+  read their roles and permissions again to check whether deleting it would lock them out: three
+  queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
+  refused). They are now read once, in `RoleList::prepare()`, and handed to
+  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
+  `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`), which
+  reads them for each of the user's own roles; an application's own list passes `ownAccess()` instead
+  to read them once. Outside a list they are still read from the database for every check, never
+  remembered for the request or taken from spatie's cache: a role deleted or taken away earlier in
+  the same request is seen, so a loop of deletes cannot lock the user out.
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
   `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).

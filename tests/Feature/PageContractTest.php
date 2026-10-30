@@ -202,7 +202,7 @@ class PageContractTest extends DefaultsTestCase
         $spare = Role::create(['name' => 'spare', 'guard_name' => 'web']);
         $user = $this->userWith()->assignRole($admin);
 
-        // The fourth parameter takes the ids of the user's roles, as in v7.1.2.
+        // The fourth parameter took the ids of the user's roles before it took an OwnAccess.
         $this->assertStringStartsWith(
             'You cannot delete this role: you would lose ',
             (string) EscalationGuard::roleDeleteRefusal($user, $admin, false, collect([$admin->id])),
@@ -211,33 +211,20 @@ class PageContractTest extends DefaultsTestCase
         $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $spare, inUse: false, ownRoleIds: collect([$admin->id])));
     }
 
-    public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
+    public function test_an_applications_list_that_passes_own_access_does_not_query_per_own_role(): void
     {
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
         $user = $this->userWith()->assignRole($admin);
 
-        config(['roles-permissions-crud.prevent_privilege_escalation' => false]);
-
-        $this->assertTrue(EscalationGuard::locksOut($user, $admin, collect())->isEmpty());
-    }
-
-    public function test_a_list_that_passes_the_ids_of_the_users_roles_does_not_query_per_own_role(): void
-    {
-        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
-        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
-        $user = $this->userWith()->assignRole($admin);
-
-        // An application's own list, as in v7.1.2: the ids of the user's roles, then every row.
+        // An application's own list: the user's access read once for the page, then every row.
         $queries = function () use ($user): int {
-            // As the next page load: the user read again, the rows' roles with their permissions.
-            $user = $user->fresh();
             $roles = Role::with('permissions')->get();
-            $ownRoleIds = $user->roles()->pluck('id');
 
             DB::flushQueryLog();
             DB::enableQueryLog();
-            $refusals = $roles->map(fn (Role $role) => EscalationGuard::roleDeleteRefusal($user, $role, false, $ownRoleIds));
+            $own = EscalationGuard::ownAccess($user);
+            $refusals = $roles->map(fn (Role $role) => EscalationGuard::roleDeleteRefusal($user, $role, false, $own));
             $count = count(DB::getQueryLog());
             DB::disableQueryLog();
 
@@ -290,6 +277,18 @@ class PageContractTest extends DefaultsTestCase
         $this->assertFalse($refused($user, $first));
         $first->syncPermissions([]);
         $this->assertTrue($refused($user, $second));
+    }
+
+    public function test_no_lock_out_while_escalation_is_not_prevented_even_with_own_access(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith()->assignRole($admin);
+        $own = EscalationGuard::ownAccess($user);
+
+        config(['roles-permissions-crud.prevent_privilege_escalation' => false]);
+
+        $this->assertTrue(EscalationGuard::locksOut($user, $admin, collect(), $own)->isEmpty());
     }
 
     public function test_the_list_offers_no_delete_that_would_lock_the_user_out(): void
