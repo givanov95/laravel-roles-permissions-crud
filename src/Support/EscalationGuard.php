@@ -162,7 +162,9 @@ final class EscalationGuard
      * Read from the database on every call, never remembered or taken from spatie's cache or the
      * user's loaded relations: a check that keeps the user from locking themselves out must weigh
      * what is stored now. A list reads it once for its page and passes it to each row, as nothing
-     * changes while the page is built; code that changes roles between checks should not.
+     * changes while the page is built; code that changes roles between checks should not. The roles
+     * list reads it only for a page with one of the user's roles, which it tells by
+     * {@see ownRoleIds()}, and passes `OwnAccess::none()` for the other rows.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {
@@ -195,20 +197,6 @@ final class EscalationGuard
         [$roles] = $own;
 
         return $roles->pluck($roles->getRelated()->getQualifiedKeyName());
-    }
-
-    /**
-     * Whether the role is one of the ids (from {@see ownRoleIds()}), by its key compared as a string, as
-     * {@see OwnAccess::includes()} compares: the same id may come as an int from one source and a
-     * string from another, and a miss would skip the lock-out check.
-     *
-     * @param  Collection<int, int|string>  $ids
-     */
-    public static function isAmong(RoleContract $role, Collection $ids): bool
-    {
-        $key = (string) $role->getKey();
-
-        return $ids->contains(fn (int|string $id) => (string) $id === $key);
     }
 
     /**
@@ -273,7 +261,7 @@ final class EscalationGuard
         }
 
         $own = $ownRoleIds instanceof Collection
-            ? (self::isAmong($role, $ownRoleIds) ? null : OwnAccess::none())
+            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
             : $ownRoleIds;
 
         $lost = self::locksOut($user, $role, collect(), $own);

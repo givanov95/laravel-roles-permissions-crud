@@ -43,6 +43,13 @@ class RoleList extends ServerList
      */
     private ?OwnAccess $own = null;
 
+    /**
+     * The permissions that guard the screens: a role without any of them cannot lock the user out.
+     *
+     * @var array<int, string>
+     */
+    private array $guarding = [];
+
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
 
@@ -54,6 +61,7 @@ class RoleList extends ServerList
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
         $this->ownRoleIds = null;
         $this->own = null;
+        $this->guarding = Authorizer::guardingPermissions();
     }
 
     protected function table(Request $request): DataTable
@@ -140,13 +148,22 @@ class RoleList extends ServerList
     }
 
     /**
-     * The user's access when the role is one of theirs, else none: nothing to weigh for it.
+     * The user's access when the role is one of theirs and its delete could lock them out, else none:
+     * nothing to weigh for it. A protected role is refused before the lock-out check, and one without
+     * a permission that guards the screens takes none of them away, so neither reads anything.
      */
-    private function ownAccessFor(mixed $user, Role $role): OwnAccess
+    private function ownAccessFor(mixed $user, Model&Role $role): OwnAccess
     {
-        $this->ownRoleIds ??= EscalationGuard::ownRoleIds($user);
+        if (EscalationGuard::isProtectedRole($role)
+            || $role->permissions->pluck('name')->intersect($this->guarding)->isEmpty()) {
+            return OwnAccess::none();
+        }
 
-        if (! EscalationGuard::isAmong($role, $this->ownRoleIds)) {
+        $this->ownRoleIds ??= EscalationGuard::ownRoleIds($user);
+        $key = (string) $role->getKey();
+
+        // Compared as strings, as OwnAccess::includes() does: a miss would skip the lock-out check.
+        if (! $this->ownRoleIds->contains(fn (int|string $id) => (string) $id === $key)) {
             return OwnAccess::none();
         }
 

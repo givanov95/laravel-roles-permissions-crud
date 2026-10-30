@@ -197,10 +197,15 @@ class PageContractTest extends DefaultsTestCase
 
     public function test_the_roles_list_reads_the_users_access_only_for_a_page_with_one_of_their_roles(): void
     {
+        config(['roles-permissions-crud.protected_roles' => ['super']]);
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
-        Role::create(['name' => 'spare', 'guard_name' => 'web']);
-        $user = $this->userWith()->assignRole($admin);
+        // Not the user's, but it carries a permission that guards the screens, so the list asks whose it is.
+        Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo('view-roles');
+        // The user's, but neither can lock them out: one guards nothing, the other is protected.
+        $plain = Role::create(['name' => 'plain', 'guard_name' => 'web']);
+        $super = Role::create(['name' => 'super', 'guard_name' => 'web'])->givePermissionTo('manage-roles');
+        $user = $this->userWith()->assignRole($admin, $plain, $super);
 
         // The roles list searched down to one role, which the user may manage.
         $queries = function (string $search) use ($user): array {
@@ -228,6 +233,14 @@ class PageContractTest extends DefaultsTestCase
         // Their roles with their permissions and their direct permissions, read only for the page that
         // has one of their roles. The other one asks only which roles are theirs, as before #46.
         $this->assertSame($without + 3, $with);
+
+        // Nothing is read for a page whose role cannot lock the user out, not even whose it is.
+        [$plainCount, $refusal] = $queries('plain');
+        $this->assertStringStartsWith('This role is assigned', (string) $refusal);
+        $this->assertSame($without - 1, $plainCount);
+        [$superCount, $refusal] = $queries('super');
+        $this->assertSame('This role is protected and cannot be deleted.', $refusal);
+        $this->assertSame($without - 1, $superCount);
 
         foreach (range(1, 3) as $n) {
             $role = Role::create(['name' => "own-{$n}", 'guard_name' => 'web']);
