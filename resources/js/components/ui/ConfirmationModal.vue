@@ -1,5 +1,34 @@
+<script lang="ts">
+// Module scope: one counter for every modal, so each gets its own ids. Counted in the browser only
+// (on mount), since a server rendering many requests would count differently (SSR).
+let lastId = 0;
+
+const FOCUSABLE = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled]):not([type='hidden'])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1']):not([disabled])",
+].join(",");
+
+/**
+ * The keydown handlers of the open modals, the last opened last. Only that one gets the keys, on the
+ * window before anything else (capture), so Escape also works with the focus outside the modal (on
+ * the body, after its focused button was disabled) and does not reach the app's own Escape handlers,
+ * which would close a drawer or dialog around the lists as well. The page scrolls again when the
+ * last one closes.
+ */
+const openModals: Array<(event: KeyboardEvent) => void> = [];
+
+/** The body's own overflow before the first modal opened, given back when the last one closes. */
+let bodyOverflow = "";
+
+const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
+</script>
+
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from "vue";
+import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 
 const props = withDefaults(
     defineProps<{ show?: boolean; maxWidth?: string }>(),
@@ -10,20 +39,95 @@ const emit = defineEmits<{ close: [] }>();
 
 const close = () => emit("close");
 
+const titleId = ref<string>();
+const contentId = ref<string>();
+const panel = ref<HTMLElement | null>(null);
+
+/** The element that had focus when the modal opened (usually the button that opened it). */
+let opener: HTMLElement | null = null;
+
+// Shown ones only: focus() does nothing on a button hidden with v-show or visibility.
+const focusables = (): HTMLElement[] =>
+    Array.from(panel.value?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
+        (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden",
+    );
+
+// Escape closes; Tab and Shift+Tab go round the modal's own buttons instead of the page behind it.
+const onKeydown = (event: KeyboardEvent) => {
+    // An Escape during an IME composition cancels the composition, not the modal.
+    if (event.key === "Escape" && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        return;
+    }
+    if (event.key !== "Tab" || !panel.value) return;
+
+    const items = focusables();
+    if (!items.length) {
+        event.preventDefault();
+        panel.value.focus();
+        return;
+    }
+
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    // Outside: back in from either end. The panel itself has the focus after a click on its text.
+    const outside = !panel.value.contains(active);
+
+    if (event.shiftKey && (active === first || active === panel.value || outside)) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (active === last || outside)) {
+        event.preventDefault();
+        first.focus();
+    }
+};
+
+const opened = () => {
+    if (openModals.includes(onKeydown)) return;
+    if (!openModals.length) {
+        bodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", onWindowKeydown, true);
+    }
+    openModals.push(onKeydown);
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // The first button is the safe one (Cancel, Close); the panel itself when there is none.
+    void nextTick(() => (focusables()[0] ?? panel.value)?.focus());
+};
+
+const closed = () => {
+    const index = openModals.indexOf(onKeydown);
+    if (index === -1) return;
+    openModals.splice(index, 1);
+    if (!openModals.length) {
+        document.body.style.overflow = bodyOverflow;
+        window.removeEventListener("keydown", onWindowKeydown, true);
+    }
+    const target = opener;
+    opener = null;
+    // Back to the button that opened it, unless it is gone (the deleted row's Delete). After the
+    // render, since the page closing the modal may remove that row in the same update.
+    void nextTick(() => {
+        if (target?.isConnected) target.focus();
+    });
+};
+
 watch(
     () => props.show,
-    (shown) => {
-        document.body.style.overflow = shown ? "hidden" : "";
-    },
+    (shown) => (shown ? opened() : closed()),
 );
 
-// A modal mounted already open (and unmounted while open) locks and frees the page as well.
+// A modal mounted already open (and unmounted while open) opens and closes as well.
 onMounted(() => {
-    if (props.show) document.body.style.overflow = "hidden";
+    const id = ++lastId;
+    titleId.value = `rp-modal-${id}-title`;
+    contentId.value = `rp-modal-${id}-content`;
+    if (props.show) opened();
 });
-onUnmounted(() => {
-    if (props.show) document.body.style.overflow = "";
-});
+onUnmounted(closed);
 </script>
 
 <template>
@@ -51,13 +155,19 @@ onUnmounted(() => {
                 >
                     <div
                         v-show="show"
-                        class="mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all sm:w-full"
+                        ref="panel"
+                        role="dialog"
+                        aria-modal="true"
+                        :aria-labelledby="titleId"
+                        :aria-describedby="contentId"
+                        tabindex="-1"
+                        class="mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
                     >
                         <div class="px-6 py-4">
-                            <div class="text-lg font-medium text-gray-900">
+                            <div :id="titleId" class="text-lg font-medium text-gray-900">
                                 <slot name="title" />
                             </div>
-                            <div class="mt-4 text-sm text-gray-600">
+                            <div :id="contentId" class="mt-4 text-sm text-gray-600">
                                 <slot name="content" />
                             </div>
                         </div>
