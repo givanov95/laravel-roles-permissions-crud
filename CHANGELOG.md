@@ -13,13 +13,16 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
-- **The user's own roles are read once per request.** Each of the user's roles on the roles list read
+- **The lock-out check reads no rows of its own.** Each of the user's roles on the roles list read
   their roles and permissions again to check whether deleting it would lock them out: three queries a
-  row (with `allow_delete_in_use`, and with every config since the rows say why a delete is refused).
-  `EscalationGuard::locksOut()` now remembers them for the request (and the queue job), as it does
-  what the user holds, so the list, the delete, the role form and an application's own list that
-  passes `$ownRoleIds` to `roleDeleteRefusal()` all read them once. The signatures stay as in v7.1.2;
-  `$ownRoleIds` is no longer needed for speed. With spatie's teams they are read for the current team.
+  row (with `allow_delete_in_use`, and with every config since the rows say why a delete is refused),
+  and the same in the delete, the role form and an application's own list that passes `$ownRoleIds`
+  to `roleDeleteRefusal()`. `EscalationGuard::locksOut()` now reads what spatie's own checks read:
+  the user's `roles` and `permissions` relations and spatie's cached permissions with their roles.
+  Spatie resets them when it changes roles, permissions or the user's assignments, so a check after
+  such a change in the same request sees it. A change made around spatie (straight in the database,
+  or on another instance of the user) needs `forgetCachedPermissions()` or `unsetRelation('roles')`,
+  as spatie's `can()` does. The signatures stay as in v7.1.2.
 - **The modals work with a keyboard and a screen reader.** `ConfirmationModal` (the delete confirmation
   and the dialog with why a delete is refused) is now announced as a dialog (`role="dialog"`,
   `aria-modal`, labelled by its title and described by its text, so a screen reader reads the reason).

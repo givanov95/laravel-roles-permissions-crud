@@ -162,11 +162,15 @@ class TeamsTest extends TestCase
         $this->getJson(route('admin.roles.index'), ['X-Inertia' => 'true'])->assertJsonPath('props.dataTable.data.0.users_count', 3);
     }
 
-    public function test_the_users_own_roles_are_read_for_the_current_team(): void
+    public function test_the_users_own_roles_are_weighed_in_the_current_team(): void
     {
-        $editor = $this->role('editor', 1);
-        $reviewer = $this->role('reviewer', 2);
-        config(['roles-permissions-crud.prevent_privilege_escalation' => true]);
+        config([
+            'roles-permissions-crud.prevent_privilege_escalation' => true,
+            'roles-permissions-crud.authorize_permissions.roles' => ['view' => 'view-roles', 'manage' => 'manage-roles'],
+        ]);
+        $manage = Permission::findOrCreate('manage-roles', 'web');
+        $editor = $this->role('editor', 1)->givePermissionTo($manage);
+        $reviewer = $this->role('reviewer', 2)->givePermissionTo($manage);
         // Only the pivot is read, so the user needs no row of its own (there is no users table here).
         $user = (new User)->forceFill(['id' => 7]);
         $user->exists = true;
@@ -175,17 +179,19 @@ class TeamsTest extends TestCase
             DB::table('model_has_roles')->insert(['role_id' => $role->id, 'model_type' => User::class, 'model_id' => $user->id, 'team_id' => $team]);
         }
 
-        // The roles are remembered for the request, but not across a change of team in it.
+        // In team 1 only the editor role is the user's, so deleting it would take manage-roles away.
         setPermissionsTeamId(1);
-        $this->assertTrue(EscalationGuard::ownAccess($user)->includes($editor));
-        $this->assertFalse(EscalationGuard::ownAccess($user)->includes($reviewer));
+        $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $editor, collect())->all());
+        $this->assertSame([], EscalationGuard::locksOut($user, $reviewer, collect())->all());
 
+        // After switching teams the user's roles are read again, as spatie asks of a team switch.
         setPermissionsTeamId(2);
-        $this->assertTrue(EscalationGuard::ownAccess($user)->includes($reviewer));
-        $this->assertFalse(EscalationGuard::ownAccess($user)->includes($editor));
+        $user->unsetRelation('roles');
+        $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $reviewer, collect())->all());
+        $this->assertSame([], EscalationGuard::locksOut($user, $editor, collect())->all());
     }
 
-        public function test_a_global_role_name_is_checked_against_every_team(): void
+    public function test_a_global_role_name_is_checked_against_every_team(): void
     {
         $this->role('editor', 1);
         $global = $this->role('admin', null);

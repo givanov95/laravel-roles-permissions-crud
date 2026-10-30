@@ -135,7 +135,7 @@ class RoleList extends ServerList
         // and can say why. Users and others together are every assignment, as EscalationGuard::roleInUse()
         // counts them. (Inside a team they are the team's; a role with assignments in other teams is a
         // global one, read-only there anyway.) Not asked when the user cannot manage it: that is a 403.
-        // The user's own roles, which the lock-out check weighs, are read once for the request.
+        // The lock-out check reads the user's roles from spatie's loaded relations and cache, not per row.
         $refusal = $canManage ? EscalationGuard::roleDeleteRefusal($user, $model, $users + $others > 0) : null;
 
         return [

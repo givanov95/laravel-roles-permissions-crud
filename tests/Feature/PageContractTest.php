@@ -202,7 +202,7 @@ class PageContractTest extends DefaultsTestCase
         $spare = Role::create(['name' => 'spare', 'guard_name' => 'web']);
         $user = $this->userWith()->assignRole($admin);
 
-        // The fourth parameter took the ids of the user's roles before it took an OwnAccess.
+        // The fourth parameter takes the ids of the user's roles, as in v7.1.2.
         $this->assertStringStartsWith(
             'You cannot delete this role: you would lose ',
             (string) EscalationGuard::roleDeleteRefusal($user, $admin, false, collect([$admin->id])),
@@ -216,8 +216,6 @@ class PageContractTest extends DefaultsTestCase
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
         $user = $this->userWith()->assignRole($admin);
-        // Read (and remembered for the request) while escalation is prevented.
-        EscalationGuard::ownAccess($user);
 
         config(['roles-permissions-crud.prevent_privilege_escalation' => false]);
 
@@ -230,11 +228,10 @@ class PageContractTest extends DefaultsTestCase
         $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
         $user = $this->userWith()->assignRole($admin);
 
-        // An application's own list, as before OwnAccess: the ids of the user's roles, then every row.
+        // An application's own list, as in v7.1.2: the ids of the user's roles, then every row.
         $queries = function () use ($user): int {
+            // As the next page load: the user read again, the rows' roles with their permissions.
             $user = $user->fresh();
-            // A new request, as the next page load is.
-            $this->app->instance('request', \Illuminate\Http\Request::create('/'));
             $roles = Role::with('permissions')->get();
             $ownRoleIds = $user->roles()->pluck('id');
 
@@ -261,17 +258,38 @@ class PageContractTest extends DefaultsTestCase
         $this->assertSame($few, $queries());
     }
 
-    public function test_the_users_own_roles_are_not_remembered_past_a_queue_job(): void
+    public function test_a_change_made_earlier_in_the_request_is_seen_by_the_next_check(): void
     {
-        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
-        $user = $this->userWith();
-        $this->assertFalse(EscalationGuard::ownAccess($user)->includes($admin));
+        // Two roles that each give the user what they need to manage access: either one may go, not both.
+        $setUp = function (): array {
+            $permissions = [Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web')];
+            $first = Role::create(['name' => uniqid('first'), 'guard_name' => 'web'])->givePermissionTo(...$permissions);
+            $second = Role::create(['name' => uniqid('second'), 'guard_name' => 'web'])->givePermissionTo(...$permissions);
 
-        $user->assignRole($admin);
-        // What a queue worker (and Octane) does between jobs.
-        $this->app->forgetScopedInstances();
+            return [$this->userWith()->assignRole($first, $second), $first, $second];
+        };
+        $refused = fn ($user, Role $role): bool => str_starts_with(
+            (string) EscalationGuard::roleDeleteRefusal($user, $role, false),
+            'You cannot delete this role: you would lose ',
+        );
 
-        $this->assertTrue(EscalationGuard::ownAccess($user)->includes($admin));
+        // An application deleting roles in a loop, with the same user, in one request.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $first->delete();
+        $this->assertTrue($refused($user, $second));
+
+        // The same after taking the first role away from the user.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $user->removeRole($first);
+        $this->assertTrue($refused($user, $second));
+
+        // And after emptying the first role.
+        [$user, $first, $second] = $setUp();
+        $this->assertFalse($refused($user, $first));
+        $first->syncPermissions([]);
+        $this->assertTrue($refused($user, $second));
     }
 
     public function test_the_list_offers_no_delete_that_would_lock_the_user_out(): void
