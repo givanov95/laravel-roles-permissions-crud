@@ -29,12 +29,19 @@ class RoleList extends ServerList
     private bool $mayManage = false;
 
     /**
-     * The user's roles and permissions, read once for the page: only their own roles can lock them
-     * out. Read whenever escalation is prevented and the user may manage roles (otherwise no row asks),
-     * as the delete checks a lock-out before whether the role is in use: the row's `delete_refusal`
-     * has to be the reason the delete gives.
+     * The ids of the user's roles, the only ones whose delete could lock them out: read at the first row
+     * the user may manage (one query), as the delete checks a lock-out before whether the role is in
+     * use and the row's `delete_refusal` has to be the reason the delete gives.
+     *
+     * @var Collection<int, int|string>|null
      */
-    private OwnAccess $own;
+    private ?Collection $ownRoleIds = null;
+
+    /**
+     * The user's roles and permissions, read once for the page at the first of their own roles on it
+     * (three queries), so a page without one (another page, a search) does not read them.
+     */
+    private ?OwnAccess $own = null;
 
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
@@ -45,7 +52,8 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->own = $this->mayManage ? EscalationGuard::ownAccess($user) : OwnAccess::none();
+        $this->ownRoleIds = null;
+        $this->own = null;
     }
 
     protected function table(Request $request): DataTable
@@ -131,6 +139,22 @@ class RoleList extends ServerList
         return $this->userType;
     }
 
+    /**
+     * The user's access when the role is one of theirs, else none: nothing to weigh for it.
+     */
+    private function ownAccessFor(mixed $user, Role $role): OwnAccess
+    {
+        $this->ownRoleIds ??= EscalationGuard::ownRoleIds($user);
+        $key = (string) $role->getKey();
+
+        // Compared as strings, as OwnAccess::includes() does: a miss would skip the lock-out check.
+        if (! $this->ownRoleIds->contains(fn (int|string $id) => (string) $id === $key)) {
+            return OwnAccess::none();
+        }
+
+        return $this->own ??= EscalationGuard::ownAccess($user);
+    }
+
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Role $model */
@@ -149,7 +173,7 @@ class RoleList extends ServerList
             $user,
             $model,
             $users + $others > 0,
-            $this->own,
+            $this->ownAccessFor($user, $model),
         ) : null;
 
         return [

@@ -195,6 +195,50 @@ class PageContractTest extends DefaultsTestCase
         $this->assertSame($few, $queries());
     }
 
+    public function test_the_roles_list_reads_the_users_access_only_for_a_page_with_one_of_their_roles(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        Role::create(['name' => 'spare', 'guard_name' => 'web']);
+        $user = $this->userWith()->assignRole($admin);
+
+        // The roles list searched down to one role, which the user may manage.
+        $queries = function (string $search) use ($user): array {
+            $url = route('admin.roles.index', ['filter' => ['global' => $search]]);
+            // Once to warm up, as in the tests above.
+            $this->actingAs($user)->getJson($url, $this->inertia())->assertOk();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $rows = $this->actingAs($user)->getJson($url, $this->inertia())->assertOk()->json('props.dataTable.data');
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            $this->assertSame([$search], array_column($rows, 'name'));
+            $this->assertTrue($rows[0]['can_manage']);
+
+            return [$count, $rows[0]['delete_refusal']];
+        };
+
+        [$without, $refusal] = $queries('spare');
+        $this->assertNull($refusal);
+        [$with, $refusal] = $queries('admin');
+        $this->assertStringStartsWith('You cannot delete this role: you would lose ', (string) $refusal);
+
+        // Their roles with their permissions and their direct permissions, read only for the page that
+        // has one of their roles. The other one asks only which roles are theirs, as before #46.
+        $this->assertSame($without + 3, $with);
+
+        foreach (range(1, 3) as $n) {
+            $role = Role::create(['name' => "own-{$n}", 'guard_name' => 'web']);
+            $role->givePermissionTo(Permission::findOrCreate('view-roles', 'web'));
+            $user->assignRole($role);
+        }
+        $user->givePermissionTo(Permission::findOrCreate('view-posts', 'web'));
+
+        $this->assertSame($without, $queries('spare')[0]);
+    }
+
     public function test_the_delete_refusal_still_takes_the_ids_of_the_users_roles(): void
     {
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);

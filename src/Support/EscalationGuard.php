@@ -176,6 +176,25 @@ final class EscalationGuard
     }
 
     /**
+     * The ids of the roles {@see ownAccess()} reads, in one query: a list asks it whether a page has any
+     * of the user's roles before reading their access (three queries) for them. The same check and the
+     * same query as `ownAccess()`, so the two cannot disagree about which roles are the user's: a miss
+     * would skip the lock-out check. Read from the database, as `ownAccess()` is.
+     *
+     * @return Collection<int, int|string>
+     */
+    public static function ownRoleIds(mixed $user): Collection
+    {
+        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+            return collect();
+        }
+
+        $roles = $user->roles()->where('guard_name', Models::guard());
+
+        return $roles->pluck($roles->getRelated()->getQualifiedKeyName());
+    }
+
+    /**
      * Whether a role is assigned to anyone. Read from the pivot, as the roles list does, because spatie's
      * Role::users() resolves its model from the active auth guard.
      */
