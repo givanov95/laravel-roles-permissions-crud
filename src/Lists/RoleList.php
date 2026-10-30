@@ -145,10 +145,8 @@ class RoleList extends ServerList
     private function ownAccessFor(mixed $user, Role $role): OwnAccess
     {
         $this->ownRoleIds ??= EscalationGuard::ownRoleIds($user);
-        $key = (string) $role->getKey();
 
-        // Compared as strings, as OwnAccess::includes() does: a miss would skip the lock-out check.
-        if (! $this->ownRoleIds->contains(fn (int|string $id) => (string) $id === $key)) {
+        if (! EscalationGuard::isAmong($role, $this->ownRoleIds)) {
             return OwnAccess::none();
         }
 

@@ -6,6 +6,7 @@ namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
@@ -165,33 +166,69 @@ final class EscalationGuard
      */
     public static function ownAccess(mixed $user): OwnAccess
     {
-        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+        $own = self::ownQueries($user);
+
+        if ($own === null) {
             return OwnAccess::none();
         }
 
-        return new OwnAccess(
-            $user->roles()->where('guard_name', Models::guard())->with('permissions:id,name')->get(),
-            $user->permissions()->where('guard_name', Models::guard())->pluck('name'),
-        );
+        [$roles, $permissions] = $own;
+
+        return new OwnAccess($roles->with('permissions:id,name')->get(), $permissions->pluck('name'));
     }
 
     /**
      * The ids of the roles {@see ownAccess()} reads, in one query: a list asks it whether a page has any
-     * of the user's roles before reading their access (three queries) for them. The same check and the
-     * same query as `ownAccess()`, so the two cannot disagree about which roles are the user's: a miss
-     * would skip the lock-out check. Read from the database, as `ownAccess()` is.
+     * of the user's roles before reading their access (three queries) for them. Read from the database,
+     * as `ownAccess()` is.
      *
      * @return Collection<int, int|string>
      */
     public static function ownRoleIds(mixed $user): Collection
     {
-        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+        $own = self::ownQueries($user);
+
+        if ($own === null) {
             return collect();
         }
 
-        $roles = $user->roles()->where('guard_name', Models::guard());
+        [$roles] = $own;
 
         return $roles->pluck($roles->getRelated()->getQualifiedKeyName());
+    }
+
+    /**
+     * Whether the role is one of the ids (from {@see ownRoleIds()}), by its key compared as a string, as
+     * {@see OwnAccess::includes()} compares: the same id may come as an int from one source and a
+     * string from another, and a miss would skip the lock-out check.
+     *
+     * @param  Collection<int, int|string>  $ids
+     */
+    public static function isAmong(RoleContract $role, Collection $ids): bool
+    {
+        $key = (string) $role->getKey();
+
+        return $ids->contains(fn (int|string $id) => (string) $id === $key);
+    }
+
+    /**
+     * The user's roles and direct permissions in the package's guard (spatie's relations, so inside a
+     * team the team's), or null when there is nothing to weigh. One place for {@see ownAccess()} and
+     * {@see ownRoleIds()}, so the two cannot disagree about which roles are the user's: a miss would
+     * skip the lock-out check.
+     *
+     * @return array{0: BelongsToMany<Model&RoleContract, Model>, 1: BelongsToMany<Model, Model>}|null
+     */
+    private static function ownQueries(mixed $user): ?array
+    {
+        if (! self::enabled() || ! $user instanceof Model || ! method_exists($user, 'roles') || ! method_exists($user, 'permissions')) {
+            return null;
+        }
+
+        return [
+            $user->roles()->where('guard_name', Models::guard()),
+            $user->permissions()->where('guard_name', Models::guard()),
+        ];
     }
 
     /**
@@ -236,7 +273,7 @@ final class EscalationGuard
         }
 
         $own = $ownRoleIds instanceof Collection
-            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
+            ? (self::isAmong($role, $ownRoleIds) ? null : OwnAccess::none())
             : $ownRoleIds;
 
         $lost = self::locksOut($user, $role, collect(), $own);

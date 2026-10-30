@@ -19,7 +19,9 @@
   refused). They are now read once, at the first of the user's roles on the page, and handed to
   `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
   A page without one of their roles (another page, a search) reads only which roles are theirs, in one
-  query, with `EscalationGuard::ownRoleIds()`, as before.
+  query, with `EscalationGuard::ownRoleIds()`, as before; `EscalationGuard::isAmong()` tells whether a
+  role is one of those ids, comparing keys as strings, as `roleDeleteRefusal()` now does for the ids
+  passed to it too.
   `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`), which
   reads them for each of the user's own roles; an application's own list passes `ownAccess()` instead
   to read them once. Outside a list they are still read from the database for every check, never
