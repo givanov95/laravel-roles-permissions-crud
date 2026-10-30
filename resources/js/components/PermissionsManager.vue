@@ -161,11 +161,19 @@ const destroy = () => {
                 {{ t('Are you sure you want to delete') }} "{{ deleteForm.name }}"?
             </template>
             <template #footer>
-                <SecondaryButton :disabled="deleting" @click="closeModal">{{ t('Cancel') }}</SecondaryButton>
+                <!-- aria-disabled, not disabled: the focused button keeps the focus while the delete runs
+                     (a disabled one drops it to the body); closeModal and destroy ignore the click. -->
+                <SecondaryButton
+                    :aria-disabled="deleting || undefined"
+                    :class="{ 'cursor-not-allowed opacity-25': deleting }"
+                    @click="closeModal"
+                >
+                    {{ t('Cancel') }}
+                </SecondaryButton>
                 <DangerButton
                     class="ms-3"
-                    :class="{ 'opacity-25': deleting }"
-                    :disabled="deleting"
+                    :aria-disabled="deleting || undefined"
+                    :class="{ 'cursor-not-allowed opacity-25': deleting }"
                     @click="destroy"
                 >
                     {{ t('Delete') }}
