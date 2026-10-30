@@ -2,9 +2,10 @@
 import type { LaravelDataTablePayload } from "@givanov95/vue-data-table/tanstack";
 import { useLaravelDataTable } from "@givanov95/vue-data-table/tanstack";
 import { Link, router, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 
 import { r, t } from "../config";
+import { focusAfterDelete, focusClicked } from "../focus";
 import { useServerPage } from "../page";
 import ListFooter from "./ui/ListFooter.vue";
 import SortableHeader from "./ui/SortableHeader.vue";
@@ -46,7 +47,17 @@ const { canCreate } = useServerPage();
 const showDeleteModal = ref(false);
 const deleteForm = useForm<{ id: number | null; name: string }>({ id: null, name: "" });
 
-const confirmDelete = (permission: Permission) => {
+/** The heading and the rows, for the focus after a delete. */
+const heading = ref<HTMLElement | null>(null);
+const rows = ref<HTMLTableSectionElement | null>(null);
+
+/** The Delete that opened the confirmation and its row's place on the page. */
+let opener: HTMLElement | null = null;
+let openerIndex = 0;
+
+const confirmDelete = (permission: Permission, index: number, event: MouseEvent) => {
+    opener = focusClicked(event);
+    openerIndex = index;
     deleteForm.id = permission.id;
     deleteForm.name = permission.name;
     showDeleteModal.value = true;
@@ -74,6 +85,9 @@ const destroy = () => {
         onFinish: () => {
             deleting.value = false;
             closeModal();
+            // After the render: the deleted row is gone by then, and the modal has given the focus
+            // back to its Delete when it is still there.
+            void nextTick(() => focusAfterDelete(opener, rows.value, openerIndex, heading.value));
         },
     });
 };
@@ -82,7 +96,7 @@ const destroy = () => {
 <template>
     <div class="rounded-lg bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-            <h2 class="text-base font-medium text-gray-900">{{ t('Manage permissions') }}</h2>
+            <h2 ref="heading" tabindex="-1" class="text-base font-medium text-gray-900">{{ t('Manage permissions') }}</h2>
             <Link v-if="canCreate" :href="(r('permissions.create') as string)">
                 <PrimaryButton type="button">{{ t('Add permission') }}</PrimaryButton>
             </Link>
@@ -111,8 +125,8 @@ const destroy = () => {
                     <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Action') }}</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-                <tr v-for="permission in table.data" :key="permission.id">
+            <tbody ref="rows" class="divide-y divide-gray-200 bg-white">
+                <tr v-for="(permission, index) in table.data" :key="permission.id">
                     <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                         {{ permission.name }}
                         <span v-if="permission.is_protected" class="ms-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
@@ -136,7 +150,7 @@ const destroy = () => {
                                 v-if="canDelete(permission)"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
-                                @click="confirmDelete(permission)"
+                                @click="confirmDelete(permission, index, $event)"
                             >
                                 {{ t('Delete') }}
                             </button>
