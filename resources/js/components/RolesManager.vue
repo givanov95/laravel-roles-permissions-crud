@@ -16,7 +16,7 @@ import RefusedDeleteButton from "./ui/RefusedDeleteButton.vue";
 import SecondaryButton from "./ui/SecondaryButton.vue";
 
 interface Role {
-    id: number;
+    id: number | string;
     name: string;
     users_count: number;
     /** Other models that have the role (missing from an older server). */
@@ -44,7 +44,7 @@ const table = useLaravelDataTable<Role>(() => props.dataTable);
 const { canCreate } = useServerPage();
 
 const showDeleteModal = ref(false);
-const deleteForm = useForm<{ id: number | null; name: string }>({ id: null, name: "" });
+const deleteForm = useForm<{ id: number | string | null; name: string }>({ id: null, name: "" });
 
 /** The heading and the rows, for the focus after a delete. */
 const heading = ref<HTMLElement | null>(null);
@@ -76,7 +76,7 @@ const destroy = () => {
     if (deleting.value) return;
     // `router.delete` does not set `deleteForm.processing`, so the modal keeps its own flag. Set in
     // `onStart`, which Inertia calls only for a visit that goes ahead (not one a `before` listener stops).
-    router.delete(r("roles.destroy", deleteForm.id as number) as string, {
+    router.delete(r("roles.destroy", deleteForm.id as number | string) as string, {
         preserveScroll: true,
         onStart: () => {
             deleting.value = true;

@@ -23,7 +23,7 @@ use Spatie\Permission\Guard;
  */
 class RoleList extends ServerList
 {
-    /** @var Collection<int, int> */
+    /** @var Collection<int, int|string> */
     private Collection $held;
 
     private bool $mayManage = false;
@@ -88,7 +88,7 @@ class RoleList extends ServerList
             ->select("{$model->getTable()}.*")
             ->selectSub($this->usersCount($key), 'users_count')
             ->selectSub($this->othersCount($key), 'others_count')
-            ->with('permissions:id,name');
+            ->with('permissions:'.Models::permissionKeyName().',name');
     }
 
     /**

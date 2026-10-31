@@ -34,10 +34,10 @@ final class EscalationGuard
     }
 
     /**
-     * The ids of the permissions the user holds. "Holds" is what the user can do, not what is stored for
+     * The keys of the permissions the user holds. "Holds" is what the user can do, not what is stored for
      * them, so a user who is let through by a `Gate::before` (the usual super admin) holds everything.
      *
-     * @return Collection<int, int>
+     * @return Collection<int, int|string>
      */
     public static function held(mixed $user): Collection
     {
@@ -45,11 +45,9 @@ final class EscalationGuard
             return collect();
         }
 
-        $resolve = fn (): Collection => Models::permissions()
-            ->get(['id', 'name'])
-            ->filter(fn (PermissionContract $permission) => $user->can($permission->name))
-            ->pluck('id')
-            ->values();
+        $resolve = fn (): Collection => Models::keys(Models::permissions()
+            ->get([Models::permissionKeyName(), 'name'])
+            ->filter(fn (PermissionContract $permission) => $user->can($permission->name)));
 
         // Remembered only for a stored user: an unsaved one has no key to tell it apart from another.
         if (! $user instanceof Model || $user->getKey() === null) {
@@ -67,11 +65,11 @@ final class EscalationGuard
      * A role is the user's to change only if they hold every permission it carries. Pass `$held` when
      * checking many roles, so it is worked out once.
      *
-     * @param  Collection<int, int>|null  $held
+     * @param  Collection<int, int|string>|null  $held
      */
     public static function canManageRole(mixed $user, RoleContract $role, ?Collection $held = null): bool
     {
-        return ! self::enabled() || $role->permissions->pluck('id')->diff($held ?? self::held($user))->isEmpty();
+        return ! self::enabled() || Models::keys($role->permissions)->diff($held ?? self::held($user))->isEmpty();
     }
 
     /**
@@ -79,7 +77,7 @@ final class EscalationGuard
      * renaming or deleting it would change roles or users beyond them. (Every role that carries a
      * permission the user does not hold is beyond them, so "nobody has it" is all that is left.)
      *
-     * @param  Collection<int, int>|null  $held
+     * @param  Collection<int, int|string>|null  $held
      */
     public static function canManagePermission(mixed $user, PermissionContract $permission, ?Collection $held = null, ?bool $inUse = null): bool
     {
@@ -90,7 +88,7 @@ final class EscalationGuard
         // A list passes what it already knows ($held, $inUse from its counts), so a page of rows does
         // not cost two queries each.
         $holds = $held !== null
-            ? $held->contains($permission->id)
+            ? $held->contains($permission->getKey())
             : $user instanceof Authorizable && $user->can($permission->name);
 
         return $holds || ! ($inUse ?? self::permissionInUse($permission));
@@ -143,7 +141,7 @@ final class EscalationGuard
      * are read once. Without it they are read from the database for this check, so a change made
      * earlier in the request is seen.
      *
-     * @param  Collection<int, int>  $remaining
+     * @param  Collection<int, int|string>  $remaining
      * @return Collection<int, string>
      */
     public static function locksOut(mixed $user, RoleContract $role, Collection $remaining, ?OwnAccess $own = null): Collection
@@ -160,7 +158,7 @@ final class EscalationGuard
 
         $elsewhere = $own->heldWithout($role);
         $taken = $role->permissions
-            ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
+            ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->getKey()))
             ->pluck('name');
         $wildcards = self::wildcardClass();
 
@@ -181,11 +179,11 @@ final class EscalationGuard
 
         // What stays on the role counts too: it may keep a wildcard while losing the exact name. Only the
         // permissions a save adds to the role are not loaded yet.
-        $stays = $role->permissions->filter(fn (PermissionContract $permission) => $remaining->contains($permission->id));
-        $added = $remaining->diff($stays->pluck('id'));
+        $stays = $role->permissions->filter(fn (PermissionContract $permission) => $remaining->contains($permission->getKey()));
+        $added = $remaining->diff(Models::keys($stays));
         $kept = $elsewhere
             ->merge($stays->pluck('name'))
-            ->merge($added->isEmpty() ? [] : Models::permissions()->whereIn('id', $added)->pluck('name'));
+            ->merge($added->isEmpty() ? [] : Models::permissions()->whereKey($added->all())->pluck('name'));
         $keeps = self::covers($wildcards, $kept);
 
         return $lost->reject(fn (string $name) => $keeps($name))->sort()->values();
@@ -310,7 +308,7 @@ final class EscalationGuard
 
         [$roles, $permissions] = $own;
 
-        return new OwnAccess($roles->with('permissions:id,name')->get(), $permissions->pluck('name'));
+        return new OwnAccess($roles->with('permissions:'.Models::permissionKeyName().',name')->get(), $permissions->pluck('name'));
     }
 
     /**
@@ -361,7 +359,7 @@ final class EscalationGuard
     {
         [$table, $key] = Models::rolePivot();
 
-        return DB::table($table)->where($key, $role->id)->exists();
+        return DB::table($table)->where($key, $role->getKey())->exists();
     }
 
     /**
@@ -371,7 +369,7 @@ final class EscalationGuard
     {
         [$table, $key] = Models::permissionPivot();
 
-        return $permission->roles()->exists() || DB::table($table)->where($key, $permission->id)->exists();
+        return $permission->roles()->exists() || DB::table($table)->where($key, $permission->getKey())->exists();
     }
 
     /**
@@ -395,7 +393,8 @@ final class EscalationGuard
         }
 
         $own = $ownRoleIds instanceof Collection
-            ? ($ownRoleIds->contains($role->id) ? null : OwnAccess::none())
+            // Compared as strings, as OwnAccess::includes() does: a miss would skip the lock-out check.
+            ? ($ownRoleIds->contains(fn (int|string $id) => (string) $id === (string) $role->getKey()) ? null : OwnAccess::none())
             : $ownRoleIds;
 
         $lost = self::locksOut($user, $role, collect(), $own);
@@ -443,8 +442,8 @@ final class EscalationGuard
     /**
      * The permissions in a request that the user would be adding to the role without holding them.
      *
-     * @param  Collection<int, int>  $requested
-     * @return Collection<int, int>
+     * @param  Collection<int, int|string>  $requested
+     * @return Collection<int, int|string>
      */
     public static function beyondTheUser(mixed $user, ?RoleContract $role, Collection $requested): Collection
     {
@@ -453,7 +452,7 @@ final class EscalationGuard
         }
 
         return $requested
-            ->diff($role?->permissions->pluck('id') ?? collect())
+            ->diff($role === null ? collect() : Models::keys($role->permissions))
             ->diff(self::held($user))
             ->values();
     }
@@ -461,14 +460,14 @@ final class EscalationGuard
     /**
      * Whether a protected role would lose a permission with this request.
      *
-     * @param  Collection<int, int>  $requested
+     * @param  Collection<int, int|string>  $requested
      */
     public static function stripsProtectedRole(?RoleContract $role, Collection $requested): bool
     {
         return self::enabled()
             && $role !== null
             && self::isProtectedRole($role)
-            && $role->permissions->pluck('id')->diff($requested)->isNotEmpty();
+            && Models::keys($role->permissions)->diff($requested)->isNotEmpty();
     }
 
     public static function isProtectedRole(RoleContract $role): bool

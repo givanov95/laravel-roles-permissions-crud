@@ -25,7 +25,7 @@ class PermissionList extends ServerList
 
     private bool $mayManage = false;
 
-    /** @var Collection<int, int> */
+    /** @var Collection<int, int|string> */
     private Collection $held;
 
     protected function prepare(Request $request): void

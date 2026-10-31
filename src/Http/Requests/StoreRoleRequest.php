@@ -28,8 +28,8 @@ class StoreRoleRequest extends FormRequest
         return [
             'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName(), ...Models::reservedRoleNameRule()],
             'permissions'   => ['array'],
-            // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
-            'permissions.*' => ['integer'],
+            // Whether each key exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
+            'permissions.*' => [Models::permissionKeyRule()],
         ];
     }
 }
