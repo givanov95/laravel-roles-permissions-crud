@@ -339,6 +339,64 @@ class PageContractTest extends DefaultsTestCase
         $this->assertCount(3, $log);
     }
 
+    public function test_with_wildcards_the_lock_out_check_asks_whose_the_role_is_first(): void
+    {
+        config(['permission.enable_wildcard_permission' => true]);
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('roles.*', 'web'));
+        // Not the user's, but it covers every permission, the guarding ones too.
+        $star = Role::create(['name' => 'star', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('*', 'web'));
+        // The user's, but it covers no permission that guards the screens.
+        $posts = Role::create(['name' => 'posts', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('posts.*', 'web'));
+        config(['roles-permissions-crud.authorize_permissions' => ['roles' => ['view' => 'roles.view', 'manage' => 'roles.manage']]]);
+        $user = $this->userWith()->assignRole($admin, $posts);
+
+        // The roles without their permissions loaded: a role that is not the user's does not load them.
+        $queries = function (array $names) use ($user): array {
+            $roles = Role::whereIn('name', $names)->orderBy('id')->get();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $own = EscalationGuard::ownAccess($user);
+            $lost = $roles->map(fn (Role $role) => EscalationGuard::locksOut($user, $role, collect(), $own)->all())->all();
+            $log = collect(DB::getQueryLog())->pluck('query');
+            DB::disableQueryLog();
+
+            return [$log, $lost];
+        };
+
+        // Which roles are the user's, then the permissions of their own one only: the other one's `*` is
+        // not loaded or weighed, and theirs covers nothing guarding, so what they hold is not read.
+        [$log, $lost] = $queries(['star', 'posts']);
+        $this->assertSame([[], []], $lost);
+        $this->assertCount(2, $log);
+        $this->assertStringContainsString('model_has_roles', $log[0]);
+        $this->assertStringContainsString('role_has_permissions', $log[1]);
+
+        // Their own role that covers the guarding permissions reads what they hold elsewhere too.
+        [$log, $lost] = $queries(['admin']);
+        $this->assertSame([['roles.manage', 'roles.view']], $lost);
+        $this->assertCount(4, $log);
+    }
+
+    public function test_the_lock_out_check_does_not_load_the_permissions_of_a_role_that_is_not_the_users(): void
+    {
+        $spare = Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('manage-roles', 'web'));
+        $user = $this->userWith(['view-roles']);
+        $spare = Role::findOrFail($spare->id);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $refusal = EscalationGuard::roleDeleteRefusal($user, $spare, false, EscalationGuard::ownAccess($user));
+        $log = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        // An application's list without the roles' permissions loaded: whose the role is, and no more.
+        $this->assertNull($refusal);
+        $this->assertCount(1, $log);
+        $this->assertStringContainsString('model_has_roles', $log[0]);
+        $this->assertFalse($spare->relationLoaded('permissions'));
+    }
+
     public function test_the_lock_out_check_reads_nothing_for_a_role_that_guards_nothing(): void
     {
         $plain = Role::create(['name' => 'plain', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('view-posts', 'web'));

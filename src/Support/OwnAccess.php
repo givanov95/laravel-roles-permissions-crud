@@ -16,16 +16,20 @@ use Spatie\Permission\Contracts\Role as RoleContract;
  * passes it to every row instead of reading them once for each of the user's roles in it.
  *
  * Read when first needed, from the database: the roles (one query) at the first {@see includes()}, and
- * their permissions and the direct ones (two queries) at the first role that is the user's. So a page
- * whose rows cannot lock the user out reads nothing, and one without the user's roles reads only those.
+ * their permissions and the direct ones (two queries) at the first of the user's roles that takes a
+ * guarding permission away. So a page without the user's roles reads only those, and without wildcards
+ * a page whose rows take no guarding permission away reads nothing.
  */
 final class OwnAccess
 {
-    /** @var Collection<int, RoleContract>|null */
-    private ?Collection $roles = null;
+    /** @var EloquentCollection<int, Model&RoleContract>|null */
+    private ?EloquentCollection $roles = null;
 
-    /** @var Collection<int, string>|null */
-    private ?Collection $direct = null;
+    /** @var Collection<int, string> */
+    private Collection $direct;
+
+    /** Whether the roles' permissions and the direct ones are read. */
+    private bool $weighed = false;
 
     /**
      * @param  BelongsToMany<Model&RoleContract, Model>|null  $rolesQuery
@@ -37,8 +41,8 @@ final class OwnAccess
     ) {}
 
     /**
-     * Nothing to weigh: escalation is not prevented, the user has no roles of their own, or the list
-     * will not ask.
+     * Nothing to weigh: escalation is not prevented, the user has no roles and permissions of their
+     * own, or the caller knows the role is not theirs.
      */
     public static function none(): self
     {
@@ -60,12 +64,10 @@ final class OwnAccess
     {
         $roles = $this->roles();
 
-        if ($this->direct === null) {
-            if ($roles instanceof EloquentCollection) {
-                $roles->load('permissions:'.Models::permissionKeyName().',name');
-            }
-
+        if (! $this->weighed) {
+            $roles->load('permissions:'.Models::permissionKeyName().',name');
             $this->direct = $this->directQuery?->pluck('name') ?? collect();
+            $this->weighed = true;
         }
 
         return $this->direct->merge($roles
@@ -74,11 +76,11 @@ final class OwnAccess
     }
 
     /**
-     * @return Collection<int, RoleContract>
+     * @return EloquentCollection<int, Model&RoleContract>
      */
-    private function roles(): Collection
+    private function roles(): EloquentCollection
     {
-        return $this->roles ??= $this->rolesQuery?->get() ?? collect();
+        return $this->roles ??= $this->rolesQuery?->get() ?? new EloquentCollection;
     }
 
     /**

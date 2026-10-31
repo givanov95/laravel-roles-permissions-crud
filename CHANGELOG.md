@@ -81,10 +81,10 @@
   that takes away a permission guarding the screens, and those roles' permissions and the user's
   direct ones (two more) at the first of the user's roles. So a page with one of their roles reads
   three queries, a page without (another page, a search) one, and a page whose rows take no guarding
-  permission away (or are protected) none. An application's own list that passes `ownAccess()` gets
-  the same. `locksOut()` weighs what the role takes away before it reads the user's access, so the
-  delete itself (and with wildcards on, every role) does not read the user's access for a role that
-  cannot lock anyone out.
+  permission away (or are protected) none; with wildcards on, a page with a role reads which roles are
+  the user's first, so a role that is not theirs is not weighed. An application's own list that passes
+  `ownAccess()` gets the same, and the permissions of a role that is not the user's are not loaded
+  when the list did not load them.
   `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`), which
   reads them for each of the user's own roles; an application's own list passes `ownAccess()` instead
   to read them once. Outside a list they are still read from the database for every check, never

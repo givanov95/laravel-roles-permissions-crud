@@ -137,8 +137,9 @@ final class EscalationGuard
      * taking "may do anything" as "cannot be locked out" would miss exactly that case. So such a user
      * is refused like anyone whose roles and permissions would not keep the access.
      *
-     * The user's roles and permissions are read only for a role that takes a guarding permission away.
-     * Pass `$own` ({@see ownAccess()}) when checking many roles, so they are read once. Without it they
+     * The user's permissions are read only for one of their roles that takes a guarding permission away,
+     * and their roles only for a role that does (or, without its permissions loaded or with wildcards
+     * on, for any role). Pass `$own` ({@see ownAccess()}) when checking many roles, so they are read once. Without it they
      * are read from the database for this check, so a change made earlier in the request is seen.
      *
      * @param  Collection<int, int|string>  $remaining
@@ -150,12 +151,21 @@ final class EscalationGuard
             return collect();
         }
 
-        // What the role takes away is weighed first, as it needs nothing of the user's: a role that takes
-        // no guarding permission away cannot lock anyone out, so the user's access is not read for it.
+        // Of the two questions, whether the role is the user's and whether it takes a guarding permission
+        // away, the cheaper one goes first. With the role's permissions at hand and without wildcards, that
+        // is what it takes away: a role that takes nothing guarding away needs nothing of the user's read.
+        // Otherwise it is whose the role is (one query for the page, through `$own`), so a role that is not
+        // theirs does not load its permissions or build spatie's wildcard index.
+        $wildcards = self::wildcardClass();
+        $weighFirst = $wildcards === null && (! $role instanceof Model || $role->relationLoaded('permissions'));
+
+        if (! $weighFirst && ! ($own ??= self::ownAccess($user))->includes($role)) {
+            return collect();
+        }
+
         $taken = $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->getKey()))
             ->pluck('name');
-        $wildcards = self::wildcardClass();
         $lost = match (true) {
             $taken->isEmpty()  => collect(),
             $wildcards === null => $taken->intersect(Authorizer::guardingPermissions()),
@@ -168,7 +178,7 @@ final class EscalationGuard
 
         $own ??= self::ownAccess($user);
 
-        if (! $own->includes($role)) {
+        if ($weighFirst && ! $own->includes($role)) {
             return collect();
         }
 
