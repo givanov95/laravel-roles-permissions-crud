@@ -155,14 +155,17 @@ final class EscalationGuard
         // away, the cheaper one goes first. With the role's permissions at hand and without wildcards, that
         // is what it takes away: a role that takes nothing guarding away needs nothing of the user's read.
         // Otherwise it is whose the role is (one query for the page, through `$own`), so a role that is not
-        // theirs does not load its permissions or build spatie's wildcard index.
-        $wildcards = self::wildcardClass();
-        $weighFirst = $wildcards === null && (! $role instanceof Model || $role->relationLoaded('permissions'));
+        // theirs does not load its permissions or read spatie's wildcard class.
+        $isOwn = function () use (&$own, $user, $role): bool {
+            return ($own ??= self::ownAccess($user))->includes($role);
+        };
+        $weighFirst = ! self::wildcardsEnabled() && (! $role instanceof Model || $role->relationLoaded('permissions'));
 
-        if (! $weighFirst && ! ($own ??= self::ownAccess($user))->includes($role)) {
+        if (! $weighFirst && ! $isOwn()) {
             return collect();
         }
 
+        $wildcards = self::wildcardClass();
         $taken = $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->getKey()))
             ->pluck('name');
@@ -176,12 +179,11 @@ final class EscalationGuard
             return collect();
         }
 
-        $own ??= self::ownAccess($user);
-
-        if ($weighFirst && ! $own->includes($role)) {
+        if ($weighFirst && ! $isOwn()) {
             return collect();
         }
 
+        /** @var OwnAccess $own set by $isOwn() */
         $elsewhere = $own->heldWithout($role);
 
         if ($wildcards === null) {

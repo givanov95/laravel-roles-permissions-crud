@@ -307,8 +307,8 @@ class PageContractTest extends DefaultsTestCase
         $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
         // Not the user's, but each takes a permission that guards the screens away, so each is asked whose it is.
-        $spare = Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo('view-roles');
-        $other = Role::create(['name' => 'other', 'guard_name' => 'web'])->givePermissionTo('manage-roles');
+        Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo('view-roles');
+        Role::create(['name' => 'other', 'guard_name' => 'web'])->givePermissionTo('manage-roles');
         $user = $this->userWith()->assignRole($admin)->givePermissionTo(Permission::findOrCreate('view-posts', 'web'));
 
         // An application's own list: the user's access made once for the page, then every row.
@@ -380,9 +380,10 @@ class PageContractTest extends DefaultsTestCase
 
     public function test_the_lock_out_check_does_not_load_the_permissions_of_a_role_that_is_not_the_users(): void
     {
-        $spare = Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('manage-roles', 'web'));
+        $created = Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('manage-roles', 'web'));
         $user = $this->userWith(['view-roles']);
-        $spare = Role::findOrFail($spare->id);
+        // Fresh, without the permissions givePermissionTo() loaded.
+        $spare = Role::findOrFail($created->id);
 
         DB::flushQueryLog();
         DB::enableQueryLog();

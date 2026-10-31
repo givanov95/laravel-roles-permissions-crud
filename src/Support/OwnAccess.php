@@ -18,7 +18,7 @@ use Spatie\Permission\Contracts\Role as RoleContract;
  * Read when first needed, from the database: the roles (one query) at the first {@see includes()}, and
  * their permissions and the direct ones (two queries) at the first of the user's roles that takes a
  * guarding permission away. So a page without the user's roles reads only those, and without wildcards
- * a page whose rows take no guarding permission away reads nothing.
+ * a page whose rows (with their permissions loaded) take no guarding permission away reads nothing.
  */
 final class OwnAccess
 {

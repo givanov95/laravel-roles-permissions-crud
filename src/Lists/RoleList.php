@@ -30,8 +30,8 @@ class RoleList extends ServerList
 
     /**
      * The user's roles and permissions, made once for the page and read only when a row needs them
-     * (see {@see EscalationGuard::ownAccess()}): a page without a role that could lock them out reads
-     * nothing, one without their roles only which roles are theirs.
+     * (see {@see EscalationGuard::ownAccess()}): a page without their roles reads only which roles are
+     * theirs, and without wildcards a page whose roles take no guarding permission away reads nothing.
      */
     private OwnAccess $own;
 
