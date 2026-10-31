@@ -29,6 +29,7 @@ const open = (event: MouseEvent) => {
 <template>
     <button
         type="button"
+        data-rp-delete
         aria-disabled="true"
         :title="reason"
         class="cursor-not-allowed rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-400"

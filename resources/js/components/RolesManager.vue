@@ -159,6 +159,7 @@ const destroy = () => {
                                 {{ t('Edit') }}
                             </Link>
                             <button
+                                data-rp-delete
                                 v-if="canDelete(role)"
                                 type="button"
                                 class="rounded-md border border-gray-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
