@@ -13,7 +13,7 @@ const FOCUSABLE = [
 ].join(",");
 
 /**
- * The keydown handlers of the open modals, the last opened last. Only that one gets the keys, on the
+ * The Escape handlers of the open modals, the last opened last. Only that one gets the key, on the
  * window before anything else (capture), so Escape also works with the focus outside the modal (on
  * the body, after its focused button was disabled) and does not reach the app's own Escape handlers,
  * which would close a drawer or dialog around the lists as well. The page scrolls again when the
@@ -28,8 +28,12 @@ const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length -
 </script>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
+/**
+ * A native `<dialog>` opened with `showModal()`: the browser keeps Tab in it and makes the page
+ * behind inert, so a screen reader's virtual cursor cannot reach the list either.
+ */
 const props = withDefaults(
     defineProps<{ show?: boolean; maxWidth?: string }>(),
     { show: false, maxWidth: "2xl" },
@@ -41,6 +45,7 @@ const close = () => emit("close");
 
 const titleId = ref<string>();
 const contentId = ref<string>();
+const dialog = ref<HTMLDialogElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
 
 /** The element that had focus when the modal opened (usually the button that opened it). */
@@ -52,37 +57,42 @@ const focusables = (): HTMLElement[] =>
         (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden",
     );
 
-// Escape closes; Tab and Shift+Tab go round the modal's own buttons instead of the page behind it.
+// The first button is the safe one (Cancel, Close); the panel itself when there is none. Not left to
+// showModal(), which focuses the panel (the first focusable element, with its tabindex). Only while
+// the page still has the modal open, since it is called after the render. Without showModal()
+// (jsdom in an app's tests) the dialog still shows, as a plain layer.
+const showDialog = () => {
+    if (!openModals.includes(onKeydown)) return;
+    if (dialog.value && !dialog.value.open) dialog.value.showModal?.();
+    (focusables()[0] ?? panel.value)?.focus();
+};
+
+// Escape asks the page to close it. Cancelled, so the browser does not close the dialog itself: the
+// page decides, and keeps it open while a delete is on its way.
 const onKeydown = (event: KeyboardEvent) => {
     // An Escape during an IME composition cancels the composition, not the modal.
-    if (event.key === "Escape" && !event.isComposing) {
-        event.preventDefault();
-        event.stopPropagation();
-        close();
-        return;
-    }
-    if (event.key !== "Tab" || !panel.value) return;
+    if (event.key !== "Escape" || event.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+};
 
-    const items = focusables();
-    if (!items.length) {
-        event.preventDefault();
-        panel.value.focus();
-        return;
-    }
+// A close request without the Escape key (Android's back): the page decides as well. One the browser
+// does not let the page stop (Chrome's with no tap or key since the last one) closes the dialog
+// right away, and onClose asks the page instead.
+const onCancel = (event: Event) => {
+    if (!event.cancelable) return;
+    event.preventDefault();
+    close();
+};
 
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    // Outside: back in from either end. The panel itself has the focus after a click on its text.
-    const outside = !panel.value.contains(active);
-
-    if (event.shiftKey && (active === first || active === panel.value || outside)) {
-        event.preventDefault();
-        last.focus();
-    } else if (!event.shiftKey && (active === last || outside)) {
-        event.preventDefault();
-        first.focus();
-    }
+// Closed by the browser, not by the page: the page is asked, and the dialog is shown again when it
+// keeps the modal open (a delete on its way). Not for the page's own close, nor for one that comes
+// after the modal was opened again (the event is queued).
+const onClose = () => {
+    if (!openModals.includes(onKeydown) || dialog.value?.open) return;
+    close();
+    void nextTick(showDialog);
 };
 
 const opened = () => {
@@ -94,8 +104,8 @@ const opened = () => {
     }
     openModals.push(onKeydown);
     opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    // The first button is the safe one (Cancel, Close); the panel itself when there is none.
-    void nextTick(() => (focusables()[0] ?? panel.value)?.focus());
+    // After the render: v-show shows the dialog and its buttons only then.
+    void nextTick(showDialog);
 };
 
 const closed = () => {
@@ -106,6 +116,9 @@ const closed = () => {
         document.body.style.overflow = bodyOverflow;
         window.removeEventListener("keydown", onWindowKeydown, true);
     }
+    // Right away: while it is modal, the page behind is inert and takes no focus. The fade-out still
+    // plays, with the closed dialog shown as a plain, inert layer (its `block` class) until it ends.
+    dialog.value?.close?.();
     const target = opener;
     opener = null;
     // Back to the button that opened it, unless it is gone (the deleted row's Delete). After the
@@ -127,13 +140,25 @@ onMounted(() => {
     contentId.value = `rp-modal-${id}-content`;
     if (props.show) opened();
 });
-onUnmounted(closed);
+onBeforeUnmount(closed);
 </script>
 
 <template>
     <teleport to="body">
         <transition leave-active-class="duration-200">
-            <div v-show="show" class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0">
+            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `text-inherit`:
+                 the page's text colour, not the browser's own one for a dialog. Inert while it fades out, so
+                 its buttons take no Tab, Enter or click once it is closed. -->
+            <dialog
+                v-show="show"
+                ref="dialog"
+                :aria-labelledby="titleId"
+                :aria-describedby="contentId"
+                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent sm:px-0"
+                :inert="!show"
+                @cancel="onCancel"
+                @close="onClose"
+            >
                 <transition
                     enter-active-class="ease-out duration-300"
                     enter-from-class="opacity-0"
@@ -153,15 +178,13 @@ onUnmounted(closed);
                     leave-from-class="opacity-100 translate-y-0 sm:scale-100"
                     leave-to-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                 >
+                    <!-- `relative`: above the overlay. Tailwind v4's `transform` alone leaves no transform, so the
+                         panel stayed under it, dimmed, and a click on its buttons hit the overlay. -->
                     <div
                         v-show="show"
                         ref="panel"
-                        role="dialog"
-                        aria-modal="true"
-                        :aria-labelledby="titleId"
-                        :aria-describedby="contentId"
                         tabindex="-1"
-                        class="mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
+                        class="relative mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
                     >
                         <div class="px-6 py-4">
                             <div :id="titleId" class="text-lg font-medium text-gray-900">
@@ -176,7 +199,7 @@ onUnmounted(closed);
                         </div>
                     </div>
                 </transition>
-            </div>
+            </dialog>
         </transition>
     </teleport>
 </template>
