@@ -1,4 +1,6 @@
 <script lang="ts">
+import type { ConfirmationModalMaxWidth } from "./modalWidth";
+
 // Module scope: one counter for every modal, so each gets its own ids. Counted in the browser only
 // (on mount), since a server rendering many requests would count differently (SSR).
 let lastId = 0;
@@ -26,10 +28,8 @@ let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
 
-type MaxWidth = "sm" | "md" | "lg" | "xl" | "2xl";
-
 /** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
-const MAX_WIDTHS: Record<MaxWidth, string> = {
+const MAX_WIDTHS: Record<ConfirmationModalMaxWidth, string> = {
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-lg",
@@ -46,7 +46,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
  * behind inert, so a screen reader's virtual cursor cannot reach the list either.
  */
 const props = withDefaults(
-    defineProps<{ show?: boolean; maxWidth?: MaxWidth }>(),
+    defineProps<{ show?: boolean; maxWidth?: ConfirmationModalMaxWidth }>(),
     { show: false, maxWidth: "lg" },
 );
 
