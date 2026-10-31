@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Support;
 
+use Closure;
 use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +12,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
+use Spatie\Permission\Contracts\Wildcard;
+use Spatie\Permission\Exceptions\WildcardPermissionNotImplementsContract;
+use Spatie\Permission\Exceptions\WildcardPermissionNotProperlyFormatted;
+use Spatie\Permission\WildcardPermission;
 
 /**
  * Keeps whoever may manage roles from handing out more than they hold, changing a role that is
@@ -115,7 +120,7 @@ final class EscalationGuard
     {
         return ! self::enabled()
             || ! ($inUse ?? self::permissionInUse($permission))
-            || (bool) config('permission.enable_wildcard_permission', false)
+            || self::wildcardsEnabled()
             || ($user instanceof Authorizable && $user->can(self::NO_SUCH_PERMISSION));
     }
 
@@ -123,6 +128,16 @@ final class EscalationGuard
      * The permissions that guard the screens (`authorize_permissions`) which the user would lose if the
      * role, one of their own, ended up with only `$remaining` (none when it is deleted) and they hold
      * them through nothing else. Whoever manages access cannot lock themselves out of it.
+     *
+     * With spatie's wildcards on, the names are matched by spatie's wildcard rules: the role takes a
+     * guarding permission away also when it only covers it (a role with just `*`), and the user keeps
+     * it when a wildcard covers it (`*`, `roles.*` for `roles.manage`) that they have directly, through
+     * another role, or that stays on this one.
+     *
+     * A `Gate::before` (the usual super admin) is not weighed: the package cannot tell whether it lets
+     * the user through because of this very role (a "Super Admin" role that is being deleted), and
+     * taking "may do anything" as "cannot be locked out" would miss exactly that case. So such a user
+     * is refused like anyone whose roles and permissions would not keep the access.
      *
      * Pass `$own` ({@see ownAccess()}) when checking many roles, so the user's roles and permissions
      * are read once. Without it they are read from the database for this check, so a change made
@@ -144,14 +159,132 @@ final class EscalationGuard
         }
 
         $elsewhere = $own->heldWithout($role);
-
-        return $role->permissions
+        $taken = $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
-            ->pluck('name')
-            ->intersect(Authorizer::guardingPermissions())
-            ->diff($elsewhere)
-            ->sort()
-            ->values();
+            ->pluck('name');
+        $wildcards = self::wildcardClass();
+
+        if ($wildcards === null) {
+            return $taken->intersect(Authorizer::guardingPermissions())->diff($elsewhere)->sort()->values();
+        }
+
+        if ($taken->isEmpty()) {
+            return collect();
+        }
+
+        $takesAway = self::covers($wildcards, $taken);
+        $lost = collect(Authorizer::guardingPermissions())->filter(fn (string $name) => $takesAway($name));
+
+        if ($lost->isEmpty()) {
+            return collect();
+        }
+
+        // What stays on the role counts too: it may keep a wildcard while losing the exact name. Only the
+        // permissions a save adds to the role are not loaded yet.
+        $stays = $role->permissions->filter(fn (PermissionContract $permission) => $remaining->contains($permission->id));
+        $added = $remaining->diff($stays->pluck('id'));
+        $kept = $elsewhere
+            ->merge($stays->pluck('name'))
+            ->merge($added->isEmpty() ? [] : Models::permissions()->whereIn('id', $added)->pluck('name'));
+        $keeps = self::covers($wildcards, $kept);
+
+        return $lost->reject(fn (string $name) => $keeps($name))->sort()->values();
+    }
+
+    /**
+     * Whether spatie's wildcard permissions are on (`permission.enable_wildcard_permission`): then a role
+     * may take a guarding permission away without carrying its name (`*`).
+     */
+    public static function wildcardsEnabled(): bool
+    {
+        return (bool) config('permission.enable_wildcard_permission', false);
+    }
+
+    /**
+     * The class spatie reads wildcard permissions with (`permission.wildcard_permission`), or null when
+     * wildcards are off. Read from the config, as {@see wildcardsEnabled()} is, so the roles list and
+     * the check agree on whether wildcards count. One that is not a spatie Wildcard fails as it does in
+     * spatie, instead of the check quietly falling back to exact names.
+     *
+     * @return class-string<Wildcard>|null
+     */
+    private static function wildcardClass(): ?string
+    {
+        if (! self::wildcardsEnabled()) {
+            return null;
+        }
+
+        $class = config('permission.wildcard_permission') ?: WildcardPermission::class;
+
+        if (! is_string($class) || ! is_subclass_of($class, Wildcard::class)) {
+            throw WildcardPermissionNotImplementsContract::create();
+        }
+
+        return $class;
+    }
+
+    /**
+     * Whether a permission name is covered by one of `$names`, by the rules of spatie's wildcard class.
+     * The class builds its index from a record's permissions, so it is given a record that has only
+     * `$names`: the user's own would also count the role being taken away. The index is built here,
+     * not taken from spatie's cache, as the check weighs what is stored now. A custom class has to
+     * build it from `getAllPermissions()`, as spatie's does: the record has nothing else.
+     *
+     * A name spatie cannot read as a wildcard (`reports.`, `a..b`) covers only itself, as it would
+     * without wildcards, instead of failing the check.
+     *
+     * @param  class-string<Wildcard>  $class
+     * @param  Collection<int, string>  $names
+     * @return Closure(string): bool
+     */
+    private static function covers(string $class, Collection $names): Closure
+    {
+        $guard = Models::guard();
+        $names = $names->unique()->values();
+        $exact = collect();
+
+        try {
+            [$wildcard, $index] = self::wildcardIndex($class, $names, $guard);
+        } catch (WildcardPermissionNotProperlyFormatted) {
+            $exact = $names->reject(function (string $name) use ($class, $guard): bool {
+                try {
+                    self::wildcardIndex($class, collect([$name]), $guard);
+
+                    return true;
+                } catch (WildcardPermissionNotProperlyFormatted) {
+                    return false;
+                }
+            })->values();
+            [$wildcard, $index] = self::wildcardIndex($class, $names->diff($exact)->values(), $guard);
+        }
+
+        return fn (string $name): bool => $exact->contains($name) || $wildcard->implies($name, $guard, $index);
+    }
+
+    /**
+     * The wildcard class for a record that has only `$names`, and the index it builds from them.
+     *
+     * @param  class-string<Wildcard>  $class
+     * @param  Collection<int, string>  $names
+     * @return array{0: Wildcard, 1: array<mixed>}
+     */
+    private static function wildcardIndex(string $class, Collection $names, string $guard): array
+    {
+        $record = new class extends Model
+        {
+            public Collection $held;
+
+            public function getAllPermissions(): Collection
+            {
+                return $this->held;
+            }
+        };
+        $record->held = $names->map(fn (string $name) => (object) ['name' => $name, 'guard_name' => $guard]);
+
+        /** @var Wildcard $wildcard */
+        $wildcard = app($class, ['record' => $record]);
+
+        return [$wildcard, $wildcard->getIndex()];
     }
 
     /**
@@ -164,8 +297,8 @@ final class EscalationGuard
      * what is stored now. A list reads it once for its page and passes it to each row, as nothing
      * changes while the page is built; code that changes roles between checks should not. The roles
      * list reads it only for a page with one of the user's roles that could lock them out (not
-     * protected, with a permission that guards the screens), which it tells by {@see ownRoleIds()},
-     * and passes `OwnAccess::none()` for the other rows.
+     * protected, with a permission that guards the screens, or any with wildcards on), which it tells
+     * by {@see ownRoleIds()}, and passes `OwnAccess::none()` for the other rows.
      */
     public static function ownAccess(mixed $user): OwnAccess
     {

@@ -31,8 +31,9 @@ class RoleList extends ServerList
     /**
      * The ids of the user's roles, the only ones whose delete could lock them out: read at the first row
      * the user may manage whose role could lock someone out (not protected, with a permission that
-     * guards the screens), in one query, as the delete checks a lock-out before whether the role is in
-     * use and the row's `delete_refusal` has to be the reason the delete gives.
+     * guards the screens, or any role with wildcards on), in one query, as the delete checks a lock-out
+     * before whether the role is in use and the row's `delete_refusal` has to be the reason the delete
+     * gives.
      *
      * @var Collection<int, int|string>|null
      */
@@ -152,12 +153,13 @@ class RoleList extends ServerList
     /**
      * The user's access when the role is one of theirs and its delete could lock them out, else none:
      * nothing to weigh for it. A protected role is refused before the lock-out check, and one without
-     * a permission that guards the screens takes none of them away, so neither reads anything.
+     * a permission that guards the screens takes none of them away, so neither reads anything. With
+     * wildcards a role may take one away without its name (`*`), so every role of the user is weighed.
      */
     private function ownAccessFor(mixed $user, Model&Role $role): OwnAccess
     {
         if (EscalationGuard::isProtectedRole($role)
-            || $role->permissions->pluck('name')->intersect($this->guarding)->isEmpty()) {
+            || (! EscalationGuard::wildcardsEnabled() && $role->permissions->pluck('name')->intersect($this->guarding)->isEmpty())) {
             return OwnAccess::none();
         }
 
