@@ -19,6 +19,10 @@
   weighed at all, so its holder could delete it and lose the screens. `locksOut()` now matches the names
   with spatie's wildcard class (`permission.wildcard_permission`). A `Gate::before` still does not keep
   the access: the package cannot tell whether it lets the user in because of the role being changed.
+  A name spatie cannot read as a wildcard (`reports.`) covers only itself instead of failing the check,
+  and a `wildcard_permission` class that is not a spatie `Wildcard` throws
+  `WildcardPermissionNotImplementsContract`, as spatie does. With wildcards on, the roles list reads the
+  ids of the user's roles on every page (one query), as any role may cover a guarding permission.
 - **`ConfirmationModal`'s `maxWidth` sets the width of the modal.** The panel was always `max-w-lg`, so
   an application passing `max-width="2xl"` got a narrow modal. It now takes `sm`, `md`, `lg`, `xl` or
   `2xl` (Tailwind's `max-w-*`; the class names are written out in the component, so the app's Tailwind
