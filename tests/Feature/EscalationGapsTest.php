@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Givanov95\RolesPermissionsCrud\Tests\Feature;
 
+use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Tests\DefaultsTestCase;
 use Givanov95\RolesPermissionsCrud\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Gate;
@@ -151,6 +152,100 @@ class EscalationGapsTest extends DefaultsTestCase
             ->assertSessionHasNoErrors();
 
         $this->assertCount(0, $other->fresh()->permissions);
+    }
+
+    // ---------------------------------------------------------------- locking yourself out, with wildcards
+
+    public function test_with_wildcards_a_user_with_star_may_take_the_access_away_from_their_own_role(): void
+    {
+        config(['permission.enable_wildcard_permission' => true, 'roles-permissions-crud.allow_delete_in_use' => true]);
+        $admin = $this->role('admin', ['view-roles', 'manage-roles']);
+        $user = $this->userWith(['*'])->assignRole($admin);
+
+        $this->actingAs($user)
+            ->put(route('admin.roles.update', $admin), ['name' => 'admin', 'permissions' => Permission::where('name', 'view-roles')->pluck('id')->all()])
+            ->assertSessionHasNoErrors();
+        $this->assertFalse($admin->fresh()->hasPermissionTo('manage-roles'));
+
+        $row = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', 'admin');
+        $this->assertTrue($row['can_delete']);
+        $this->assertNull($row['delete_refusal']);
+
+        $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.type', 'success');
+        $this->assertModelMissing($admin);
+    }
+
+    public function test_with_wildcards_a_wildcard_through_another_role_keeps_the_access(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.authorize_permissions.roles' => ['view' => 'roles.view', 'manage' => 'roles.manage'],
+        ]);
+        $admin = $this->role('admin', ['roles.view', 'roles.manage']);
+        $user = $this->userWith()->assignRole($admin, $this->role('roles-anything', ['roles.*']));
+
+        $this->assertSame([], EscalationGuard::locksOut($user, $admin, collect())->all());
+        $this->assertSame([], EscalationGuard::locksOut($user, $admin, collect(), EscalationGuard::ownAccess($user))->all());
+        $this->assertNull(EscalationGuard::roleDeleteRefusal($user, $admin));
+    }
+
+    public function test_with_wildcards_a_wildcard_covers_only_the_names_it_matches_by_spatie_rules(): void
+    {
+        // The delimiter is the dot: roles.* covers roles.manage, not manage-roles.
+        config(['permission.enable_wildcard_permission' => true]);
+        $admin = $this->role('admin', ['view-roles', 'manage-roles']);
+        $user = $this->userWith()->assignRole($admin, $this->role('roles-anything', ['roles.*']));
+
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $admin, collect())->all());
+    }
+
+    public function test_with_wildcards_a_role_with_only_a_wildcard_cannot_be_deleted_by_whoever_it_lets_in(): void
+    {
+        config(['permission.enable_wildcard_permission' => true, 'roles-permissions-crud.allow_delete_in_use' => true]);
+        $admin = $this->role('admin', ['*']);
+        $user = $this->userWith()->assignRole($admin);
+
+        $row = collect($this->actingAs($user)->getJson(route('admin.roles.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', 'admin');
+        $this->assertFalse($row['can_delete']);
+        $this->assertStringStartsWith('You cannot delete this role: you would lose ', $row['delete_refusal']);
+        $this->assertStringContainsString('manage-roles', $row['delete_refusal']);
+
+        $this->actingAs($user)->delete(route('admin.roles.destroy', $admin))->assertInertiaFlash('toast.message', $row['delete_refusal']);
+        $this->assertModelExists($admin);
+    }
+
+    public function test_with_wildcards_a_role_may_lose_the_names_its_wildcard_keeps_but_not_the_wildcard(): void
+    {
+        config(['permission.enable_wildcard_permission' => true]);
+        $admin = $this->role('admin', ['*', 'view-roles', 'manage-roles']);
+        $user = $this->userWith()->assignRole($admin);
+        $ids = fn (string ...$names) => Permission::whereIn('name', $names)->pluck('id')->all();
+
+        // Without the wildcard the role keeps only view-roles: the rest of what guards the screens, which
+        // the wildcard covered, would be gone.
+        $this->actingAs($user)
+            ->put(route('admin.roles.update', $admin), ['name' => 'admin', 'permissions' => $ids('view-roles')])
+            ->assertSessionHasErrors(['permissions' => 'You cannot take manage-permissions, manage-roles, view-permissions away from your own role, you need them to manage access.']);
+
+        // The wildcard alone still does.
+        $this->actingAs($user)
+            ->put(route('admin.roles.update', $admin), ['name' => 'admin', 'permissions' => $ids('*')])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(['*'], $admin->fresh()->permissions->pluck('name')->all());
+    }
+
+    public function test_with_wildcards_a_gate_before_still_does_not_keep_the_access(): void
+    {
+        // The package cannot tell whether the Gate::before lets the user in because of this very role.
+        config(['permission.enable_wildcard_permission' => true]);
+        Gate::before(fn () => true);
+        $admin = $this->role('admin', ['view-roles', 'manage-roles']);
+        $user = $this->userWith()->assignRole($admin);
+
+        $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $admin, collect())->all());
     }
 
     // ---------------------------------------------------------------- deleting what is in use

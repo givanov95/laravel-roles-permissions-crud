@@ -13,6 +13,12 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **The lock-out check reads spatie's wildcard permissions.** With `enable_wildcard_permission` on, a
+  user with `*`, or `roles.*` through another role, was refused taking `roles.manage` away from their own
+  role or deleting it, though they kept the access. The other way round, a role with only `*` was not
+  weighed at all, so its holder could delete it and lose the screens. `locksOut()` now matches the names
+  with spatie's wildcard class (`permission.wildcard_permission`). A `Gate::before` still does not keep
+  the access: the package cannot tell whether it lets the user in because of the role being changed.
 - **`ConfirmationModal`'s `maxWidth` sets the width of the modal.** The panel was always `max-w-lg`, so
   an application passing `max-width="2xl"` got a narrow modal. It now takes `sm`, `md`, `lg`, `xl` or
   `2xl` (Tailwind's `max-w-*`; the class names are written out in the component, so the app's Tailwind
