@@ -13,6 +13,12 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **`ConfirmationModal`'s `maxWidth` sets the width of the modal.** The panel was always `max-w-lg`, so
+  an application passing `max-width="2xl"` got a narrow modal. It now takes `sm`, `md`, `lg`, `xl` or
+  `2xl` (Tailwind's `max-w-*`; the class names are written out in the component, so the app's Tailwind
+  finds them where it finds the package's other classes). The default is now `lg`, the width every modal
+  has had, instead of the `2xl` it never applied: modals without `max-width` look as before. Another
+  value is a type error, and at runtime gives the default width.
 - **A screen reader cannot leave an open modal for the page behind it.** `ConfirmationModal` is now a
   native `<dialog>` opened with `showModal()`: the page behind is inert, so a screen reader's virtual
   cursor (arrows, rotor) cannot reach the list either, also one that ignores `aria-modal`. The

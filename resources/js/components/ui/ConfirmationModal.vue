@@ -25,19 +25,31 @@ const openModals: Array<(event: KeyboardEvent) => void> = [];
 let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
+
+/** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
+const MAX_WIDTHS: Record<"sm" | "md" | "lg" | "xl" | "2xl", string> = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+    "2xl": "max-w-2xl",
+};
 </script>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 /**
  * A native `<dialog>` opened with `showModal()`: the browser keeps Tab in it and makes the page
  * behind inert, so a screen reader's virtual cursor cannot reach the list either.
  */
 const props = withDefaults(
-    defineProps<{ show?: boolean; maxWidth?: string }>(),
-    { show: false, maxWidth: "2xl" },
+    defineProps<{ show?: boolean; maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" }>(),
+    { show: false, maxWidth: "lg" },
 );
+
+// An unknown value (from plain JavaScript) gets the default width.
+const maxWidthClass = computed(() => MAX_WIDTHS[props.maxWidth] ?? MAX_WIDTHS.lg);
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -184,7 +196,8 @@ onBeforeUnmount(closed);
                         v-show="show"
                         ref="panel"
                         tabindex="-1"
-                        class="relative mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
+                        :class="maxWidthClass"
+                        class="relative mx-auto mt-12 w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
                     >
                         <div class="px-6 py-4">
                             <div :id="titleId" class="text-lg font-medium text-gray-900">
