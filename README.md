@@ -97,7 +97,8 @@ Tailwind must scan the package's components for their classes (v4 skips `node_mo
 
    A model with another primary key works too, such as spatie's UUID set-up (`HasUuids` and
    `$primaryKey = 'uuid'`, with UUID columns in the pivot tables). The screens read the key from the
-   model, the role form sends permission keys as strings when the key is not an integer, and the
+   model, the role form sends permission keys as strings when the key is not an integer (validated
+   as `uuid` or `ulid` for a key made by `HasUuids` or `HasUlids`, else as `string`), and the
    `id` fields of the pages and rows carry that key. Route binding finds a record by the configured
    model's key because the package binds spatie's `Role` and `Permission` classes in the container to
    the configured ones, so `app(\Spatie\Permission\Models\Role::class)` gives your model.

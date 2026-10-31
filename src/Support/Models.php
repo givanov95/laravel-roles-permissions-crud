@@ -201,11 +201,12 @@ final class Models
      */
     public static function permissionKeyRule(): string
     {
-        if (self::permissionKeyIsInt()) {
+        $model = new (self::permissionClass());
+
+        if (in_array($model->getKeyType(), ['int', 'integer'], true)) {
             return 'integer';
         }
 
-        $model = new (self::permissionClass());
         $traits = class_uses_recursive($model);
         $generated = in_array($model->getKeyName(), $model->uniqueIds(), true);
 
