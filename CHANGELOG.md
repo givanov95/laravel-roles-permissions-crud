@@ -32,8 +32,7 @@
   the access: the package cannot tell whether it lets the user in because of the role being changed.
   A name spatie cannot read as a wildcard (`reports.`) covers only itself instead of failing the check,
   and a `wildcard_permission` class that is not a spatie `Wildcard` throws
-  `WildcardPermissionNotImplementsContract`, as spatie does. With wildcards on, the roles list reads the
-  ids of the user's roles on every page (one query), as any role may cover a guarding permission.
+  `WildcardPermissionNotImplementsContract`, as spatie does.
 - **`ConfirmationModal`'s `maxWidth` sets the width of the modal.** The panel was always `max-w-lg`, so
   an application passing `max-width="2xl"` got a narrow modal. It now takes `sm`, `md`, `lg`, `xl` or
   `2xl` (Tailwind's `max-w-*`; the class names are written out in the component, so the app's Tailwind
@@ -76,11 +75,16 @@
 - **The roles list reads the user's own roles once per page.** Each of the user's roles on the page
   read their roles and permissions again to check whether deleting it would lock them out: three
   queries a row (with `allow_delete_in_use`, and with every config since the rows say why a delete is
-  refused). They are now read once, at the first of the user's roles on the page, and handed to
-  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`).
-  A page without one of their roles (another page, a search) reads only which roles are theirs, in one
-  query, with `EscalationGuard::ownRoleIds()`, as before, and a page whose rows carry no permission that
-  guards the screens (or only protected roles) reads nothing.
+  refused). The list now makes the user's access once for the page and hands it to
+  `EscalationGuard::roleDeleteRefusal()` / `locksOut()` as an `OwnAccess` (`EscalationGuard::ownAccess()`),
+  which reads it only when a row needs it: which roles are the user's (one query) at the first role
+  that takes away a permission guarding the screens, and those roles' permissions and the user's
+  direct ones (two more) at the first of the user's roles. So a page with one of their roles reads
+  three queries, a page without (another page, a search) one, and a page whose rows take no guarding
+  permission away (or are protected) none; with wildcards on, a page with a role reads which roles are
+  the user's first, so a role that is not theirs is not weighed. An application's own list that passes
+  `ownAccess()` gets the same, and the permissions of a role that is not the user's are not loaded
+  when the list did not load them.
   `roleDeleteRefusal()` still takes the ids of the user's roles in its place (`$ownRoleIds`), which
   reads them for each of the user's own roles; an application's own list passes `ownAccess()` instead
   to read them once. Outside a list they are still read from the database for every check, never
