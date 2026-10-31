@@ -2,6 +2,7 @@
 import { ref } from "vue";
 
 import { t } from "../../config";
+import { focusClicked } from "../../focus";
 import ConfirmationModal from "./ConfirmationModal.vue";
 import SecondaryButton from "./SecondaryButton.vue";
 
@@ -17,15 +18,22 @@ defineProps<{
 }>();
 
 const show = ref(false);
+
+// Focused first, so the dialog gives the focus back to it on close (see focusClicked).
+const open = (event: MouseEvent) => {
+    focusClicked(event);
+    show.value = true;
+};
 </script>
 
 <template>
     <button
         type="button"
+        data-rp-delete
         aria-disabled="true"
         :title="reason"
         class="cursor-not-allowed rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-400"
-        @click="show = true"
+        @click="open"
     >
         {{ t('Delete') }}
     </button>

@@ -13,6 +13,14 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **The focus does not drop to the page's start when a delete dialog closes.** After a delete, the
+  row's Delete is gone, so the focus went to the body and the keyboard started again from the top:
+  `RolesManager` and `PermissionsManager` now move it to the Delete of the row that took the deleted
+  one's place (the row before, when the last row went), else to that row's Edit, else to the list's
+  heading. And Safari and Firefox on macOS do not focus a button on a click, so a dialog opened with
+  the mouse had nothing to give the focus back to: the Delete buttons (the refused one too) now focus
+  themselves before they open it. An application opening `ConfirmationModal` from its own button does
+  the same (`button.focus()` in its click handler).
 - **The delete confirmation stays locked while the delete runs.** `RolesManager` and `PermissionsManager`
   locked Delete on a form the request never used, so it stayed active: a second click sent a second
   request, and Escape, the overlay or Cancel closed the dialog mid-request (the request then closed a
