@@ -56,6 +56,13 @@ Vite must bundle the package source (it ships `.ts`/`.vue`, not a build):
 noExternal: ['@givanov95/vue-roles-permissions-crud', '@givanov95/vue-data-table']
 ```
 
+Tailwind must scan the package's components for their classes (v4 skips `node_modules`):
+
+```css
+/* resources/css/app.css */
+@source '../../node_modules/@givanov95/vue-roles-permissions-crud/resources/js';
+```
+
 ## Backend wiring
 
 1. (Optional) publish & tune the config:

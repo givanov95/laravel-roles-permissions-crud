@@ -26,8 +26,10 @@ let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
 
+type MaxWidth = "sm" | "md" | "lg" | "xl" | "2xl";
+
 /** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
-const MAX_WIDTHS: Record<"sm" | "md" | "lg" | "xl" | "2xl", string> = {
+const MAX_WIDTHS: Record<MaxWidth, string> = {
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-lg",
@@ -44,12 +46,14 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
  * behind inert, so a screen reader's virtual cursor cannot reach the list either.
  */
 const props = withDefaults(
-    defineProps<{ show?: boolean; maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" }>(),
+    defineProps<{ show?: boolean; maxWidth?: MaxWidth }>(),
     { show: false, maxWidth: "lg" },
 );
 
-// An unknown value (from plain JavaScript) gets the default width.
-const maxWidthClass = computed(() => MAX_WIDTHS[props.maxWidth] ?? MAX_WIDTHS.lg);
+// An unknown value (from plain JavaScript) gets the default width. Own keys only: `toString` is not one.
+const maxWidthClass = computed(() =>
+    Object.hasOwn(MAX_WIDTHS, props.maxWidth) ? MAX_WIDTHS[props.maxWidth] : MAX_WIDTHS.lg,
+);
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -197,7 +201,7 @@ onBeforeUnmount(closed);
                         ref="panel"
                         tabindex="-1"
                         :class="maxWidthClass"
-                        class="relative mx-auto mt-12 w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
+                        class="relative mx-auto mt-12 w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none"
                     >
                         <div class="px-6 py-4">
                             <div :id="titleId" class="text-lg font-medium text-gray-900">

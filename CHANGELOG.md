@@ -18,7 +18,9 @@
   `2xl` (Tailwind's `max-w-*`; the class names are written out in the component, so the app's Tailwind
   finds them where it finds the package's other classes). The default is now `lg`, the width every modal
   has had, instead of the `2xl` it never applied: modals without `max-width` look as before. Another
-  value is a type error, and at runtime gives the default width.
+  value gives the default width, and is now a type error: an app that passes `max-width` as any
+  `string` (a variable typed `string`, or a width such as `3xl`) fails `vue-tsc` until it passes one
+  of the five. The new widths need the app's Tailwind to scan the package (see the README's Install).
 - **A screen reader cannot leave an open modal for the page behind it.** `ConfirmationModal` is now a
   native `<dialog>` opened with `showModal()`: the page behind is inert, so a screen reader's virtual
   cursor (arrows, rotor) cannot reach the list either, also one that ignores `aria-modal`. The
