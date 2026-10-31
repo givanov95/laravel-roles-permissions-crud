@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
 use Spatie\Permission\Contracts\Wildcard;
+use Spatie\Permission\Exceptions\WildcardPermissionNotImplementsContract;
 use Spatie\Permission\Exceptions\WildcardPermissionNotProperlyFormatted;
 use Spatie\Permission\WildcardPermission;
 
@@ -202,8 +203,8 @@ final class EscalationGuard
     /**
      * The class spatie reads wildcard permissions with (`permission.wildcard_permission`), or null when
      * wildcards are off. Read from the config, as {@see wildcardsEnabled()} is, so the roles list and
-     * the check agree on whether wildcards count. One that is not a spatie Wildcard is not used: spatie
-     * refuses it on every check anyway.
+     * the check agree on whether wildcards count. One that is not a spatie Wildcard fails as it does in
+     * spatie, instead of the check quietly falling back to exact names.
      *
      * @return class-string<Wildcard>|null
      */
@@ -215,7 +216,11 @@ final class EscalationGuard
 
         $class = config('permission.wildcard_permission') ?: WildcardPermission::class;
 
-        return is_string($class) && is_subclass_of($class, Wildcard::class) ? $class : null;
+        if (! is_string($class) || ! is_subclass_of($class, Wildcard::class)) {
+            throw WildcardPermissionNotImplementsContract::create();
+        }
+
+        return $class;
     }
 
     /**

@@ -8,6 +8,7 @@ use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Tests\DefaultsTestCase;
 use Givanov95\RolesPermissionsCrud\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Exceptions\WildcardPermissionNotImplementsContract;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -250,6 +251,17 @@ class EscalationGapsTest extends DefaultsTestCase
             ['manage-permissions', 'manage-roles', 'view-permissions', 'view-roles'],
             EscalationGuard::locksOut($user, $admin, $ids('reports.'))->all(),
         );
+    }
+
+    public function test_with_wildcards_a_wildcard_class_that_is_not_one_fails_as_in_spatie(): void
+    {
+        // Not a quiet fall back to exact names, which would let a role with only `*` be deleted.
+        config(['permission.enable_wildcard_permission' => true, 'permission.wildcard_permission' => \stdClass::class]);
+        $admin = $this->role('admin', ['*']);
+        $user = $this->userWith()->assignRole($admin);
+
+        $this->expectException(WildcardPermissionNotImplementsContract::class);
+        EscalationGuard::locksOut($user, $admin, collect());
     }
 
     public function test_with_wildcards_a_gate_before_still_does_not_keep_the_access(): void
