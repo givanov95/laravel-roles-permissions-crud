@@ -19,8 +19,12 @@
   modal's own Tab loop is gone: Tab goes round its buttons and the browser's own controls (address
   bar), never the page. The rest stays as before: Escape closes it and does not reach the app's own
   listeners, the first button gets the focus, the focus goes back to the opener, the page does not
-  scroll, and the delete confirmation stays open while the delete runs (Android's back included).
-  The props, slots and `close` event are unchanged.
+  scroll, and the delete confirmation stays open while the delete runs (a close request from the
+  browser itself, such as Android's back, asks the page too). While it fades out, the closed modal is
+  inert, so its buttons no longer take a Tab, Enter or click. The props, slots and `close` event are
+  unchanged. The open modal is drawn in the browser's top layer, so the app's own layers (toasts,
+  Inertia's progress bar) show under its overlay whatever their `z-index`. Without `showModal()`
+  (jsdom in an app's tests) it shows as a plain layer.
 - **The modal's buttons take a mouse click with Tailwind v4.** Its `transform` class leaves no
   transform in Tailwind v4, so the panel stayed under the grey overlay: it looked dimmed, and a click
   on Delete or Cancel hit the overlay and closed the modal instead (nothing was deleted). The panel

@@ -59,12 +59,11 @@ const focusables = (): HTMLElement[] =>
 
 // The first button is the safe one (Cancel, Close); the panel itself when there is none. Not left to
 // showModal(), which focuses the panel (the first focusable element, with its tabindex). Only while
-// the page still has the modal open, since it is called after the render. Also on the dialog's
-// `close`: Chrome closes it anyway at a second close request with no click or key in between, and it
-// is shown again while the page still has it open.
+// the page still has the modal open, since it is called after the render. Without showModal()
+// (jsdom in an app's tests) the dialog still shows, as a plain layer.
 const showDialog = () => {
     if (!openModals.includes(onKeydown)) return;
-    if (dialog.value && !dialog.value.open) dialog.value.showModal();
+    if (dialog.value && !dialog.value.open) dialog.value.showModal?.();
     (focusables()[0] ?? panel.value)?.focus();
 };
 
@@ -78,10 +77,22 @@ const onKeydown = (event: KeyboardEvent) => {
     close();
 };
 
-// A close request without the Escape key (Android's back): the page decides as well.
+// A close request without the Escape key (Android's back): the page decides as well. One the browser
+// does not let the page stop (Chrome's with no tap or key since the last one) closes the dialog
+// right away, and onClose asks the page instead.
 const onCancel = (event: Event) => {
+    if (!event.cancelable) return;
     event.preventDefault();
     close();
+};
+
+// Closed by the browser, not by the page: the page is asked, and the dialog is shown again when it
+// keeps the modal open (a delete on its way). Not for the page's own close, nor for one that comes
+// after the modal was opened again (the event is queued).
+const onClose = () => {
+    if (!openModals.includes(onKeydown) || dialog.value?.open) return;
+    close();
+    void nextTick(showDialog);
 };
 
 const opened = () => {
@@ -106,8 +117,8 @@ const closed = () => {
         window.removeEventListener("keydown", onWindowKeydown, true);
     }
     // Right away: while it is modal, the page behind is inert and takes no focus. The fade-out still
-    // plays, with the closed dialog shown as a plain layer (its `block` class) until it ends.
-    dialog.value?.close();
+    // plays, with the closed dialog shown as a plain, inert layer (its `block` class) until it ends.
+    dialog.value?.close?.();
     const target = opener;
     opener = null;
     // Back to the button that opened it, unless it is gone (the deleted row's Delete). After the
@@ -136,15 +147,17 @@ onBeforeUnmount(closed);
     <teleport to="body">
         <transition leave-active-class="duration-200">
             <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `text-inherit`:
-                 the page's text colour, not the browser's own one for a dialog. -->
+                 the page's text colour, not the browser's own one for a dialog. Inert while it fades out, so
+                 its buttons take no Tab, Enter or click once it is closed. -->
             <dialog
                 v-show="show"
                 ref="dialog"
                 :aria-labelledby="titleId"
                 :aria-describedby="contentId"
                 class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent sm:px-0"
+                :inert="!show"
                 @cancel="onCancel"
-                @close="showDialog"
+                @close="onClose"
             >
                 <transition
                     enter-active-class="ease-out duration-300"
