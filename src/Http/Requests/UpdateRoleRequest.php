@@ -8,7 +8,9 @@ use Givanov95\RolesPermissionsCrud\Http\Requests\Concerns\ChecksPermissionGrants
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
+use Spatie\Permission\Contracts\Role as RoleContract;
 
 class UpdateRoleRequest extends FormRequest
 {
@@ -27,13 +29,15 @@ class UpdateRoleRequest extends FormRequest
      */
     public function rules(): array
     {
-        $roleId = $this->route('role')?->id;
+        $role = $this->route('role');
+        $role = $role instanceof Model && $role instanceof RoleContract ? $role : null;
 
         return [
-            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()->ignore($roleId), ...($this->input('name') === $this->route('role')?->name ? [] : Models::reservedRoleNameRule())],
+            // Ignored as a model, so by its own key column (ignore() of a bare id looks at `id`).
+            'name'          => ['required', 'string', 'max:255', Models::uniqueRoleName()->ignore($role), ...($this->input('name') === $role?->name ? [] : Models::reservedRoleNameRule())],
             'permissions'   => ['array'],
-            // Whether each id exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
-            'permissions.*' => ['integer'],
+            // Whether each key exists in the guard is checked with the escalation checks (ChecksPermissionGrants).
+            'permissions.*' => [Models::permissionKeyRule()],
         ];
     }
 }

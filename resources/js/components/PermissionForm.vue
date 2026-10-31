@@ -11,7 +11,7 @@ import TextInput from "./ui/TextInput.vue";
 
 const props = defineProps<{
     /** `can_rename` is missing from an older server: the name is then editable as before. */
-    permission?: { id: number; name: string; is_protected: boolean; can_rename?: boolean };
+    permission?: { id: number | string; name: string; is_protected: boolean; can_rename?: boolean };
 }>();
 
 const isEdit = computed(() => !!props.permission);

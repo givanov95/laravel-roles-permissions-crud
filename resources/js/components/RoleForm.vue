@@ -10,20 +10,20 @@ import SecondaryButton from "./ui/SecondaryButton.vue";
 import TextInput from "./ui/TextInput.vue";
 
 interface RoleData {
-    id: number;
+    id: number | string;
     name: string;
-    permissions: number[];
+    permissions: (number | string)[];
     is_protected: boolean;
 }
 
 const props = defineProps<{
     role?: RoleData;
-    permissions: { value: number; label: string }[];
+    permissions: { value: number | string; label: string }[];
 }>();
 
 const isEdit = computed(() => !!props.role);
 
-const form = useForm<{ _method?: string; name: string; permissions: number[] }>({
+const form = useForm<{ _method?: string; name: string; permissions: (number | string)[] }>({
     _method: props.role ? "PUT" : undefined,
     name: props.role?.name ?? "",
     permissions: props.role ? [...props.role.permissions] : [],

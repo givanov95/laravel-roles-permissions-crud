@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
@@ -175,6 +178,71 @@ final class Models
     }
 
     /**
+     * The primary key column of the configured permission model: `id` for spatie's, `uuid` (or anything
+     * else) for an application's own model with another key.
+     */
+    public static function permissionKeyName(): string
+    {
+        return (new (self::permissionClass()))->getKeyName();
+    }
+
+    /**
+     * Whether the configured permission model has an integer key; otherwise (a UUID or ULID) it is a string.
+     */
+    public static function permissionKeyIsInt(): bool
+    {
+        return in_array((new (self::permissionClass()))->getKeyType(), ['int', 'integer'], true);
+    }
+
+    /**
+     * The rule a submitted permission key passes: an integer, a UUID or ULID for a model whose key Laravel
+     * generates as one (`HasUuids`, `HasUlids`), or else a string. A malformed UUID has to fail here: on a
+     * native `uuid` column (PostgreSQL) the query that looks it up would throw instead.
+     */
+    public static function permissionKeyRule(): string
+    {
+        $model = new (self::permissionClass());
+
+        if (in_array($model->getKeyType(), ['int', 'integer'], true)) {
+            return 'integer';
+        }
+
+        $traits = class_uses_recursive($model);
+        $generated = in_array($model->getKeyName(), $model->uniqueIds(), true);
+
+        return match (true) {
+            $generated && isset($traits[HasUuids::class]) => 'uuid',
+            $generated && isset($traits[HasUlids::class]) => 'ulid',
+            default => 'string',
+        };
+    }
+
+    /**
+     * Submitted permission keys as the model stores them: form values arrive as strings, so an integer key
+     * is cast back to an int, and any other key is kept as the string it is.
+     *
+     * @param  array<mixed>  $values
+     * @return Collection<int, int|string>
+     */
+    public static function permissionKeys(array $values): Collection
+    {
+        $int = self::permissionKeyIsInt();
+
+        return collect(array_values($values))->map(fn (mixed $key) => $int ? (int) $key : (string) $key);
+    }
+
+    /**
+     * The primary keys of the records, whatever the key column is called.
+     *
+     * @param  iterable<Model>  $records
+     * @return Collection<int, int|string>
+     */
+    public static function keys(iterable $records): Collection
+    {
+        return collect($records)->map(fn (Model $record) => $record->getKey())->values();
+    }
+
+    /**
      * The table that assigns roles to users (and other models) and its role key column.
      *
      * @return array{0: string, 1: string}
@@ -201,8 +269,10 @@ final class Models
     }
 
     /**
-     * The route-bound role as the configured class. The route binds spatie's class, so that the routes
-     * also work when cached; this swaps the instance without another query.
+     * The route-bound role as the configured class. The routes type-hint spatie's class, so that they also
+     * work when cached, and the service provider has the container make the configured class for it, so
+     * route binding finds the record by the configured model's key. Should an application bind spatie's
+     * class to something else, this still swaps the instance without another query.
      */
     public static function role(Role $role): Role
     {

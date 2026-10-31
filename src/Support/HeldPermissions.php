@@ -18,7 +18,7 @@ use WeakMap;
  */
 final class HeldPermissions
 {
-    /** @var WeakMap<Request, array<string, Collection<int, int>>> */
+    /** @var WeakMap<Request, array<string, Collection<int, int|string>>> */
     private WeakMap $byRequest;
 
     public function __construct()
@@ -27,8 +27,8 @@ final class HeldPermissions
     }
 
     /**
-     * @param  Closure(): Collection<int, int>  $resolve
-     * @return Collection<int, int>
+     * @param  Closure(): Collection<int, int|string>  $resolve
+     * @return Collection<int, int|string>
      */
     public function remember(Request $request, string $key, Closure $resolve): Collection
     {

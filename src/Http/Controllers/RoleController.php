@@ -13,12 +13,14 @@ use Givanov95\RolesPermissionsCrud\Lists\RoleList;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -62,10 +64,7 @@ class RoleController extends Controller
                 'guard_name' => Models::guard(),
             ]);
 
-            // Cast to int: form values arrive as numeric strings and Spatie treats
-            // a string permission as a *name* (not an id), so "2" would be looked up
-            // by name and throw PermissionDoesNotExist. Ids must be integers.
-            $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+            $role->syncPermissions($this->permissionsFor($request->validated('permissions', [])));
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been created.')]);
@@ -79,9 +78,9 @@ class RoleController extends Controller
 
         return $this->render('roles/Edit', [
             'role' => [
-                'id'           => $role->id,
+                'id'           => $role->getKey(),
                 'name'         => $role->name,
-                'permissions'  => $role->permissions->pluck('id'),
+                'permissions'  => Models::keys($role->permissions),
                 'is_protected' => EscalationGuard::isProtectedRole($role),
             ],
             'permissions' => $this->permissionOptions($role),
@@ -99,10 +98,7 @@ class RoleController extends Controller
                 $role->update(['name' => $request->validated('name')]);
             }
 
-            // Cast to int: form values arrive as numeric strings and Spatie treats
-            // a string permission as a *name* (not an id), so "2" would be looked up
-            // by name and throw PermissionDoesNotExist. Ids must be integers.
-            $role->syncPermissions(array_map('intval', $request->validated('permissions', [])));
+            $role->syncPermissions($this->permissionsFor($request->validated('permissions', [])));
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('The role has been updated.')]);
@@ -130,22 +126,35 @@ class RoleController extends Controller
     }
 
     /**
+     * The submitted permissions as records, for syncPermissions(). Given keys, spatie would read a form
+     * value as a name unless it is an int or looks like a UUID or ULID, so "2" or another string key
+     * would not be found. The request has already checked that each key is a permission of the guard.
+     *
+     * @param  array<mixed>  $keys
+     * @return Collection<int, Permission>
+     */
+    protected function permissionsFor(array $keys): Collection
+    {
+        return $keys === [] ? new Collection : Models::permissions()->whereKey(Models::permissionKeys($keys)->all())->get();
+    }
+
+    /**
      * The permissions the form offers: only what the user holds while escalation is prevented, plus the
      * ones the role already has, so that saving the form does not drop them.
      *
-     * @return array<int, array{value: int, label: string}>
+     * @return array<int, array{value: int|string, label: string}>
      */
     protected function permissionOptions(?Role $role = null): array
     {
         $held = EscalationGuard::held(request()->user());
-        $own = $role?->permissions->pluck('id') ?? collect();
+        $own = $role === null ? collect() : Models::keys($role->permissions);
 
         return Models::permissions()
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->filter(fn (PermissionContract $permission) => ! EscalationGuard::enabled() || $held->contains($permission->id) || $own->contains($permission->id))
+            ->get([Models::permissionKeyName(), 'name'])
+            ->filter(fn (PermissionContract $permission) => ! EscalationGuard::enabled() || $held->contains($permission->getKey()) || $own->contains($permission->getKey()))
             ->map(fn (PermissionContract $permission) => [
-                'value' => $permission->id,
+                'value' => $permission->getKey(),
                 'label' => $permission->name,
             ])
             ->values()

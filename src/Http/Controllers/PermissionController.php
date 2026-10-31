@@ -71,7 +71,7 @@ class PermissionController extends Controller
 
         return $this->render('permissions/Edit', [
             'permission' => [
-                'id'           => $permission->id,
+                'id'           => $permission->getKey(),
                 'name'         => $permission->name,
                 'is_protected' => $this->isProtected($permission),
                 // A rename hands the new name to everyone who has the permission, so one in use is renamed

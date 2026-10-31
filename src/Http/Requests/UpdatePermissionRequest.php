@@ -8,6 +8,7 @@ use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -50,10 +51,11 @@ class UpdatePermissionRequest extends FormRequest
      */
     public function rules(): array
     {
-        $permissionId = $this->route('permission')?->id;
+        $permission = $this->route('permission');
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())->ignore($permissionId)],
+            // Ignored as a model, so by its own key column (ignore() of a bare id looks at `id`).
+            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())->ignore($permission instanceof Model ? $permission : null)],
         ];
     }
 }

@@ -8,8 +8,11 @@ use Givanov95\RolesPermissionsCrud\Http\Controllers\PermissionController;
 use Givanov95\RolesPermissionsCrud\Http\Controllers\RoleController;
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\HeldPermissions;
+use Givanov95\RolesPermissionsCrud\Support\Models;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesPermissionsCrudServiceProvider extends ServiceProvider
 {
@@ -21,6 +24,14 @@ class RolesPermissionsCrudServiceProvider extends ServiceProvider
         );
 
         $this->app->scoped(HeldPermissions::class);
+
+        // The routes type-hint spatie's classes, so that they also work when cached, and route binding makes
+        // the type-hinted class through the container before it looks the record up. Made as the configured
+        // classes (`permission.models.*`), the record is found by their primary key: an application's own
+        // model may use another one (`uuid`), and spatie's class would look for an `id` column.
+        // `attributes` is passed on, as the container would to spatie's constructor.
+        $this->app->bind(Role::class, fn ($app, array $parameters = []) => new (Models::roleClass())($parameters['attributes'] ?? []));
+        $this->app->bind(Permission::class, fn ($app, array $parameters = []) => new (Models::permissionClass())($parameters['attributes'] ?? []));
     }
 
     public function boot(): void

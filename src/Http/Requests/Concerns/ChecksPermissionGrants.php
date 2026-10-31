@@ -29,9 +29,9 @@ trait ChecksPermissionGrants
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
-            $requested = collect((array) $this->input('permissions', []))->map(fn (mixed $id) => (int) $id);
+            $requested = Models::permissionKeys((array) $this->input('permissions', []));
 
-            $unknown = $requested->diff(Models::permissions()->whereIn('id', $requested)->pluck('id'));
+            $unknown = $requested->diff(Models::permissions()->whereKey($requested->all())->pluck(Models::permissionKeyName()));
             $beyond = EscalationGuard::beyondTheUser($this->user(), $role, $requested);
 
             // One message, without names, for an id that does not exist in the guard and one the user may

@@ -95,6 +95,14 @@ Tailwind must scan the package's components for their classes (v4 skips `node_mo
    `delete()`, …) sees every change made in these screens. Each write, such as
    creating a role together with its permissions, runs in one database transaction.
 
+   A model with another primary key works too, such as spatie's UUID set-up (`HasUuids` and
+   `$primaryKey = 'uuid'`, with UUID columns in the pivot tables). The screens read the key from the
+   model, the role form sends permission keys as strings when the key is not an integer (validated
+   as `uuid` or `ulid` for a key made by `HasUuids` or `HasUlids`, else as `string`), and the
+   `id` fields of the pages and rows carry that key. Route binding finds a record by the configured
+   model's key because the package binds spatie's `Role` and `Permission` classes in the container to
+   the configured ones, so `app(\Spatie\Permission\Models\Role::class)` gives your model.
+
 4. The lists come from the server. `index()` sends one `dataTable` prop, the payload of
    laravel-data-table's `DataTable::toArray()`: the rows of the page, `meta` (page, total),
    `columns` and the applied `state`.

@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Added
+- **Role and permission models with another primary key.** An application whose models use another
+  key, such as spatie's UUID set-up (`HasUuids`, `$primaryKey = 'uuid'`), got "no such column
+  permissions.id" on the lists, the forms and the deletes, and its permission keys were cast to
+  integers. The key column and type now come from the configured models, the role form takes string
+  keys (`permissions.*` is validated as `uuid` or `ulid` for a key made by `HasUuids` or `HasUlids`,
+  as `string` for any other key that is not an integer), and the role's
+  permissions are synced as records, so spatie does not read a key as a name. Route binding finds the
+  record by the configured model's key: the service provider binds spatie's `Role` and `Permission`
+  classes in the container to the configured ones, so `app(Role::class)` in the application now gives
+  the configured model as well. In the Vue components the `id` of a row, a role and a permission, and
+  the permission keys of `RoleForm`, are typed `number | string`.
 - **The lists say why a record cannot be deleted.** Rows send `delete_refusal`: the translated message
   the delete would refuse with (protected, in use, or the user would lose access they need), or `null`
   when the delete would go through or the user may not manage the record. `RolesManager` and
