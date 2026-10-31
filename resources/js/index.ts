@@ -8,6 +8,7 @@ export { default as PrimaryButton } from "./components/ui/PrimaryButton.vue";
 export { default as SecondaryButton } from "./components/ui/SecondaryButton.vue";
 export { default as DangerButton } from "./components/ui/DangerButton.vue";
 export { default as ConfirmationModal } from "./components/ui/ConfirmationModal.vue";
+export type { ConfirmationModalMaxWidth } from "./components/ui/modalWidth";
 
 // Auth helpers ($hasRole / $can).
 export { RolesPlugin } from "./plugins/RolesPlugin";

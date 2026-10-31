@@ -1,4 +1,6 @@
 <script lang="ts">
+import type { ConfirmationModalMaxWidth } from "./modalWidth";
+
 // Module scope: one counter for every modal, so each gets its own ids. Counted in the browser only
 // (on mount), since a server rendering many requests would count differently (SSR).
 let lastId = 0;
@@ -25,18 +27,34 @@ const openModals: Array<(event: KeyboardEvent) => void> = [];
 let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
+
+/** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
+const MAX_WIDTHS: Record<ConfirmationModalMaxWidth, string> = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+    "2xl": "max-w-2xl",
+};
 </script>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 /**
  * A native `<dialog>` opened with `showModal()`: the browser keeps Tab in it and makes the page
  * behind inert, so a screen reader's virtual cursor cannot reach the list either.
  */
+// The widths written out, not ConfirmationModalMaxWidth: the SFC compiler then needs no other file for
+// the runtime props. MAX_WIDTHS' type keeps the two the same.
 const props = withDefaults(
-    defineProps<{ show?: boolean; maxWidth?: string }>(),
-    { show: false, maxWidth: "2xl" },
+    defineProps<{ show?: boolean; maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" }>(),
+    { show: false, maxWidth: "lg" },
+);
+
+// An unknown value (from plain JavaScript) gets the default width. Own keys only: `toString` is not one.
+const maxWidthClass = computed(() =>
+    Object.prototype.hasOwnProperty.call(MAX_WIDTHS, props.maxWidth) ? MAX_WIDTHS[props.maxWidth] : MAX_WIDTHS.lg,
 );
 
 const emit = defineEmits<{ close: [] }>();
@@ -146,7 +164,8 @@ onBeforeUnmount(closed);
 <template>
     <teleport to="body">
         <transition leave-active-class="duration-200">
-            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `text-inherit`:
+            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `px-4` at every
+                 width: a 2xl panel (672px) would touch the screen's edges just above `sm`. `text-inherit`:
                  the page's text colour, not the browser's own one for a dialog. Inert while it fades out, so
                  its buttons take no Tab, Enter or click once it is closed. -->
             <dialog
@@ -154,7 +173,7 @@ onBeforeUnmount(closed);
                 ref="dialog"
                 :aria-labelledby="titleId"
                 :aria-describedby="contentId"
-                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent sm:px-0"
+                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent"
                 :inert="!show"
                 @cancel="onCancel"
                 @close="onClose"
@@ -184,7 +203,8 @@ onBeforeUnmount(closed);
                         v-show="show"
                         ref="panel"
                         tabindex="-1"
-                        class="relative mx-auto mt-12 w-full max-w-lg transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none sm:w-full"
+                        :class="maxWidthClass"
+                        class="relative mx-auto mt-12 w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all focus:outline-none"
                     >
                         <div class="px-6 py-4">
                             <div :id="titleId" class="text-lg font-medium text-gray-900">
