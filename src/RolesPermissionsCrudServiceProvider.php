@@ -29,8 +29,9 @@ class RolesPermissionsCrudServiceProvider extends ServiceProvider
         // the type-hinted class through the container before it looks the record up. Made as the configured
         // classes (`permission.models.*`), the record is found by their primary key: an application's own
         // model may use another one (`uuid`), and spatie's class would look for an `id` column.
-        $this->app->bind(Role::class, fn () => new (Models::roleClass()));
-        $this->app->bind(Permission::class, fn () => new (Models::permissionClass()));
+        // `attributes` is passed on, as the container would to spatie's constructor.
+        $this->app->bind(Role::class, fn ($app, array $parameters = []) => new (Models::roleClass())($parameters['attributes'] ?? []));
+        $this->app->bind(Permission::class, fn ($app, array $parameters = []) => new (Models::permissionClass())($parameters['attributes'] ?? []));
     }
 
     public function boot(): void

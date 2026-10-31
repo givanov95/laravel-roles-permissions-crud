@@ -31,6 +31,17 @@ class ConfiguredModelsTest extends TestCase
         CustomPermission::$events = [];
     }
 
+    public function test_the_container_makes_the_configured_models_for_spatie_classes(): void
+    {
+        $role = app(\Spatie\Permission\Models\Role::class, ['attributes' => ['name' => 'editor']]);
+        $permission = app(\Spatie\Permission\Models\Permission::class, ['attributes' => ['name' => 'view-posts']]);
+
+        $this->assertInstanceOf(CustomRole::class, $role);
+        $this->assertSame('editor', $role->name);
+        $this->assertInstanceOf(CustomPermission::class, $permission);
+        $this->assertSame('view-posts', $permission->name);
+    }
+
     public function test_role_writes_go_through_the_configured_model(): void
     {
         $this->post(route('admin.roles.store'), ['name' => 'editor'])->assertRedirect();

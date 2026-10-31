@@ -204,6 +204,12 @@ class UuidKeysTest extends DefaultsTestCase
         UuidPermission::findOrCreate('delete-everything', 'web');
         $user = $this->userWithRole($admin);
 
+        // A key that is no UUID fails validation before it reaches the query, which would throw on a
+        // native uuid column (PostgreSQL).
+        $this->actingAs($user)
+            ->post(route('admin.roles.store'), ['name' => 'rogue', 'permissions' => ['abc']])
+            ->assertSessionHasErrors('permissions.0');
+
         // A permission the user does not hold, and a uuid that is no permission.
         foreach ([$this->keys(['delete-everything']), [(string) Str::uuid()]] as $permissions) {
             $this->actingAs($user)

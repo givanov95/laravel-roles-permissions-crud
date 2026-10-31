@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Givanov95\RolesPermissionsCrud\Support;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
@@ -193,11 +195,25 @@ final class Models
     }
 
     /**
-     * The rule a submitted permission key passes: an integer, or a string for a model with a UUID or ULID key.
+     * The rule a submitted permission key passes: an integer, a UUID or ULID for a model whose key Laravel
+     * generates as one (`HasUuids`, `HasUlids`), or else a string. A malformed UUID has to fail here: on a
+     * native `uuid` column (PostgreSQL) the query that looks it up would throw instead.
      */
     public static function permissionKeyRule(): string
     {
-        return self::permissionKeyIsInt() ? 'integer' : 'string';
+        if (self::permissionKeyIsInt()) {
+            return 'integer';
+        }
+
+        $model = new (self::permissionClass());
+        $traits = class_uses_recursive($model);
+        $generated = in_array($model->getKeyName(), $model->uniqueIds(), true);
+
+        return match (true) {
+            $generated && isset($traits[HasUuids::class]) => 'uuid',
+            $generated && isset($traits[HasUlids::class]) => 'ulid',
+            default => 'string',
+        };
     }
 
     /**

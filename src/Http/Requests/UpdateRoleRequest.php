@@ -8,8 +8,9 @@ use Givanov95\RolesPermissionsCrud\Http\Requests\Concerns\ChecksPermissionGrants
 use Givanov95\RolesPermissionsCrud\Support\Authorizer;
 use Givanov95\RolesPermissionsCrud\Support\EscalationGuard;
 use Givanov95\RolesPermissionsCrud\Support\Models;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
-use Spatie\Permission\Models\Role;
+use Spatie\Permission\Contracts\Role as RoleContract;
 
 class UpdateRoleRequest extends FormRequest
 {
@@ -29,7 +30,7 @@ class UpdateRoleRequest extends FormRequest
     public function rules(): array
     {
         $role = $this->route('role');
-        $role = $role instanceof Role ? $role : null;
+        $role = $role instanceof Model && $role instanceof RoleContract ? $role : null;
 
         return [
             // Ignored as a model, so by its own key column (ignore() of a bare id looks at `id`).
