@@ -45,8 +45,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
  * A native `<dialog>` opened with `showModal()`: the browser keeps Tab in it and makes the page
  * behind inert, so a screen reader's virtual cursor cannot reach the list either.
  */
+// The widths written out, not ConfirmationModalMaxWidth: the SFC compiler then needs no other file for
+// the runtime props. MAX_WIDTHS' type keeps the two the same.
 const props = withDefaults(
-    defineProps<{ show?: boolean; maxWidth?: ConfirmationModalMaxWidth }>(),
+    defineProps<{ show?: boolean; maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" }>(),
     { show: false, maxWidth: "lg" },
 );
 
