@@ -29,29 +29,11 @@ class RoleList extends ServerList
     private bool $mayManage = false;
 
     /**
-     * The ids of the user's roles, the only ones whose delete could lock them out: read at the first row
-     * the user may manage whose role could lock someone out (not protected, with a permission that
-     * guards the screens, or any role with wildcards on), in one query, as the delete checks a lock-out
-     * before whether the role is in use and the row's `delete_refusal` has to be the reason the delete
-     * gives.
-     *
-     * @var Collection<int, int|string>|null
+     * The user's roles and permissions, made once for the page and read only when a row needs them
+     * (see {@see EscalationGuard::ownAccess()}): a page without a role that could lock them out reads
+     * nothing, one without their roles only which roles are theirs.
      */
-    private ?Collection $ownRoleIds = null;
-
-    /**
-     * The user's roles and permissions, read once for the page at the first of their own roles on it
-     * that could lock them out (three queries), so a page without one (another page, a search) does
-     * not read them.
-     */
-    private ?OwnAccess $own = null;
-
-    /**
-     * The permissions that guard the screens: a role without any of them cannot lock the user out.
-     *
-     * @var array<int, string>
-     */
-    private array $guarding = [];
+    private OwnAccess $own;
 
     /** The guard's user model as stored in the pivot; false until worked out. */
     private string|false|null $userType = false;
@@ -62,9 +44,7 @@ class RoleList extends ServerList
 
         $this->held = EscalationGuard::held($user);
         $this->mayManage = Authorizer::allows($user, 'roles', Authorizer::MANAGE);
-        $this->ownRoleIds = null;
-        $this->own = null;
-        $this->guarding = Authorizer::guardingPermissions();
+        $this->own = EscalationGuard::ownAccess($user);
     }
 
     protected function table(Request $request): DataTable
@@ -150,30 +130,6 @@ class RoleList extends ServerList
         return $this->userType;
     }
 
-    /**
-     * The user's access when the role is one of theirs and its delete could lock them out, else none:
-     * nothing to weigh for it. A protected role is refused before the lock-out check, and one without
-     * a permission that guards the screens takes none of them away, so neither reads anything. With
-     * wildcards a role may take one away without its name (`*`), so every role of the user is weighed.
-     */
-    private function ownAccessFor(mixed $user, Model&Role $role): OwnAccess
-    {
-        if (EscalationGuard::isProtectedRole($role)
-            || (! EscalationGuard::wildcardsEnabled() && $role->permissions->pluck('name')->intersect($this->guarding)->isEmpty())) {
-            return OwnAccess::none();
-        }
-
-        $this->ownRoleIds ??= EscalationGuard::ownRoleIds($user);
-        $key = (string) $role->getKey();
-
-        // Compared as strings, as OwnAccess::includes() does: a miss would skip the lock-out check.
-        if (! $this->ownRoleIds->contains(fn (int|string $id) => (string) $id === $key)) {
-            return OwnAccess::none();
-        }
-
-        return $this->own ??= EscalationGuard::ownAccess($user);
-    }
-
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Role $model */
@@ -192,7 +148,7 @@ class RoleList extends ServerList
             $user,
             $model,
             $users + $others > 0,
-            $this->ownAccessFor($user, $model),
+            $this->own,
         ) : null;
 
         return [

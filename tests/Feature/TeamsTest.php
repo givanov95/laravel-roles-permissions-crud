@@ -184,8 +184,6 @@ class TeamsTest extends TestCase
         setPermissionsTeamId(1);
         $this->assertTrue(EscalationGuard::ownAccess($user)->includes($editor));
         $this->assertFalse(EscalationGuard::ownAccess($user)->includes($reviewer));
-        // The ids a list asks first are the same roles.
-        $this->assertEquals([$editor->id], EscalationGuard::ownRoleIds($user)->all());
         $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $editor, collect())->all());
         $this->assertSame([], EscalationGuard::locksOut($user, $reviewer, collect())->all());
 
@@ -193,7 +191,6 @@ class TeamsTest extends TestCase
         setPermissionsTeamId(2);
         $this->assertTrue(EscalationGuard::ownAccess($user)->includes($reviewer));
         $this->assertFalse(EscalationGuard::ownAccess($user)->includes($editor));
-        $this->assertEquals([$reviewer->id], EscalationGuard::ownRoleIds($user)->all());
         $this->assertSame(['manage-roles'], EscalationGuard::locksOut($user, $reviewer, collect())->all());
     }
 

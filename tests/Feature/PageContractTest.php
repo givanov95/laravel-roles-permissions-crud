@@ -230,9 +230,9 @@ class PageContractTest extends DefaultsTestCase
         [$with, $refusal] = $queries('admin');
         $this->assertStringStartsWith('You cannot delete this role: you would lose ', (string) $refusal);
 
-        // Their roles with their permissions and their direct permissions, read only for the page that
-        // has one of their roles. The other one asks only which roles are theirs, as before #46.
-        $this->assertSame($without + 3, $with);
+        // The permissions of their roles and their direct permissions, read only for the page that has one
+        // of their roles. Both pages read which roles are theirs, once (#58).
+        $this->assertSame($without + 2, $with);
 
         // Nothing is read for a page whose role cannot lock the user out, not even whose it is.
         [$plainCount, $refusal] = $queries('plain');
@@ -300,6 +300,60 @@ class PageContractTest extends DefaultsTestCase
         }
 
         $this->assertSame($few, $queries());
+    }
+
+    public function test_an_applications_list_that_passes_own_access_reads_the_permissions_only_for_a_page_with_the_users_roles(): void
+    {
+        $admin = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->givePermissionTo(Permission::findOrCreate('view-roles', 'web'), Permission::findOrCreate('manage-roles', 'web'));
+        // Not the user's, but each takes a permission that guards the screens away, so each is asked whose it is.
+        $spare = Role::create(['name' => 'spare', 'guard_name' => 'web'])->givePermissionTo('view-roles');
+        $other = Role::create(['name' => 'other', 'guard_name' => 'web'])->givePermissionTo('manage-roles');
+        $user = $this->userWith()->assignRole($admin)->givePermissionTo(Permission::findOrCreate('view-posts', 'web'));
+
+        // An application's own list: the user's access made once for the page, then every row.
+        $queries = function (array $names) use ($user): array {
+            $roles = Role::with('permissions')->whereIn('name', $names)->orderBy('id')->get();
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $own = EscalationGuard::ownAccess($user);
+            $refusals = $roles->map(fn (Role $role) => EscalationGuard::roleDeleteRefusal($user, $role, false, $own))->all();
+            $log = collect(DB::getQueryLog())->pluck('query');
+            DB::disableQueryLog();
+
+            return [$log, $refusals];
+        };
+
+        // A page without the user's roles reads only which roles are theirs, not what they hold.
+        [$log, $refusals] = $queries(['spare', 'other']);
+        $this->assertSame([null, null], $refusals);
+        $this->assertCount(1, $log);
+        $this->assertStringContainsString('model_has_roles', $log[0]);
+        $this->assertFalse($log->contains(fn (string $query) => str_contains($query, 'role_has_permissions') || str_contains($query, 'model_has_permissions')));
+
+        // A page with one of them reads their roles, those roles' permissions and their direct permissions.
+        [$log, $refusals] = $queries(['admin', 'spare', 'other']);
+        $this->assertStringStartsWith('You cannot delete this role: you would lose ', (string) $refusals[0]);
+        $this->assertSame([null, null], array_slice($refusals, 1));
+        $this->assertCount(3, $log);
+    }
+
+    public function test_the_lock_out_check_reads_nothing_for_a_role_that_guards_nothing(): void
+    {
+        $plain = Role::create(['name' => 'plain', 'guard_name' => 'web'])->givePermissionTo(Permission::findOrCreate('view-posts', 'web'));
+        $user = $this->userWith(['view-roles', 'manage-roles'])->assignRole($plain);
+        $plain->load('permissions');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $lost = EscalationGuard::locksOut($user, $plain, collect());
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        // The user's own role, but taking it away takes nothing that guards the screens.
+        $this->assertSame([], $lost->all());
+        $this->assertSame(0, $count);
     }
 
     public function test_a_change_made_earlier_in_the_request_is_seen_by_the_next_check(): void
