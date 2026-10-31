@@ -13,6 +13,18 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **A screen reader cannot leave an open modal for the page behind it.** `ConfirmationModal` is now a
+  native `<dialog>` opened with `showModal()`: the page behind is inert, so a screen reader's virtual
+  cursor (arrows, rotor) cannot reach the list either, also one that ignores `aria-modal`. The
+  modal's own Tab loop is gone: Tab goes round its buttons and the browser's own controls (address
+  bar), never the page. The rest stays as before: Escape closes it and does not reach the app's own
+  listeners, the first button gets the focus, the focus goes back to the opener, the page does not
+  scroll, and the delete confirmation stays open while the delete runs (Android's back included).
+  The props, slots and `close` event are unchanged.
+- **The modal's buttons take a mouse click with Tailwind v4.** Its `transform` class leaves no
+  transform in Tailwind v4, so the panel stayed under the grey overlay: it looked dimmed, and a click
+  on Delete or Cancel hit the overlay and closed the modal instead (nothing was deleted). The panel
+  is now positioned above the overlay.
 - **The focus does not drop to the page's start when a delete dialog closes.** After a delete, the
   row's Delete is gone, so the focus went to the body and the keyboard started again from the top:
   `RolesManager` and `PermissionsManager` now move it to the Delete of the row that took the deleted
