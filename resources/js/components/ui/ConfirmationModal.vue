@@ -59,7 +59,9 @@ const focusables = (): HTMLElement[] =>
 
 // The first button is the safe one (Cancel, Close); the panel itself when there is none. Not left to
 // showModal(), which focuses the panel (the first focusable element, with its tabindex). Only while
-// the page still has the modal open, since it is called after the render.
+// the page still has the modal open, since it is called after the render. Also on the dialog's
+// `close`: Chrome closes it anyway at a second close request with no click or key in between, and it
+// is shown again while the page still has it open.
 const showDialog = () => {
     if (!openModals.includes(onKeydown)) return;
     if (dialog.value && !dialog.value.open) dialog.value.showModal();
@@ -81,10 +83,6 @@ const onCancel = (event: Event) => {
     event.preventDefault();
     close();
 };
-
-// Chrome closes the dialog anyway at a second close request with no click or key in between. Shown
-// again while the page still has it open.
-const onClose = () => showDialog();
 
 const opened = () => {
     if (openModals.includes(onKeydown)) return;
@@ -137,15 +135,16 @@ onBeforeUnmount(closed);
 <template>
     <teleport to="body">
         <transition leave-active-class="duration-200">
-            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. -->
+            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `text-inherit`:
+                 the page's text colour, not the browser's own one for a dialog. -->
             <dialog
                 v-show="show"
                 ref="dialog"
                 :aria-labelledby="titleId"
                 :aria-describedby="contentId"
-                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 backdrop:bg-transparent sm:px-0"
+                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent sm:px-0"
                 @cancel="onCancel"
-                @close="onClose"
+                @close="showDialog"
             >
                 <transition
                     enter-active-class="ease-out duration-300"
