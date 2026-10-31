@@ -52,7 +52,7 @@ const props = withDefaults(
 
 // An unknown value (from plain JavaScript) gets the default width. Own keys only: `toString` is not one.
 const maxWidthClass = computed(() =>
-    Object.hasOwn(MAX_WIDTHS, props.maxWidth) ? MAX_WIDTHS[props.maxWidth] : MAX_WIDTHS.lg,
+    Object.prototype.hasOwnProperty.call(MAX_WIDTHS, props.maxWidth) ? MAX_WIDTHS[props.maxWidth] : MAX_WIDTHS.lg,
 );
 
 const emit = defineEmits<{ close: [] }>();
@@ -162,7 +162,8 @@ onBeforeUnmount(closed);
 <template>
     <teleport to="body">
         <transition leave-active-class="duration-200">
-            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `text-inherit`:
+            <!-- Full screen and see-through: the overlay and the panel inside draw the modal. `px-4` at every
+                 width: a 2xl panel (672px) would touch the screen's edges just above `sm`. `text-inherit`:
                  the page's text colour, not the browser's own one for a dialog. Inert while it fades out, so
                  its buttons take no Tab, Enter or click once it is closed. -->
             <dialog
@@ -170,7 +171,7 @@ onBeforeUnmount(closed);
                 ref="dialog"
                 :aria-labelledby="titleId"
                 :aria-describedby="contentId"
-                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent sm:px-0"
+                class="fixed inset-0 z-50 m-0 block h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-transparent px-4 py-6 text-inherit backdrop:bg-transparent"
                 :inert="!show"
                 @cancel="onCancel"
                 @close="onClose"
