@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Contracts\Role as RoleContract;
 use Spatie\Permission\Contracts\Wildcard;
+use Spatie\Permission\Exceptions\WildcardPermissionNotProperlyFormatted;
+use Spatie\Permission\WildcardPermission;
 
 /**
  * Keeps whoever may manage roles from handing out more than they hold, changing a role that is
@@ -159,7 +161,7 @@ final class EscalationGuard
         $taken = $role->permissions
             ->reject(fn (PermissionContract $permission) => $remaining->contains($permission->id))
             ->pluck('name');
-        $wildcards = self::wildcardClass($user);
+        $wildcards = self::wildcardClass();
 
         if ($wildcards === null) {
             return $taken->intersect(Authorizer::guardingPermissions())->diff($elsewhere)->sort()->values();
@@ -176,10 +178,13 @@ final class EscalationGuard
             return collect();
         }
 
-        // What stays on the role counts too: it may keep a wildcard while losing the exact name.
-        $kept = $remaining->isEmpty()
-            ? $elsewhere
-            : $elsewhere->merge(Models::permissions()->whereIn('id', $remaining)->pluck('name'));
+        // What stays on the role counts too: it may keep a wildcard while losing the exact name. Only the
+        // permissions a save adds to the role are not loaded yet.
+        $stays = $role->permissions->filter(fn (PermissionContract $permission) => $remaining->contains($permission->id));
+        $added = $remaining->diff($stays->pluck('id'));
+        $kept = $elsewhere
+            ->merge($stays->pluck('name'))
+            ->merge($added->isEmpty() ? [] : Models::permissions()->whereIn('id', $added)->pluck('name'));
         $keeps = self::covers($wildcards, $kept);
 
         return $lost->reject(fn (string $name) => $keeps($name))->sort()->values();
@@ -195,27 +200,33 @@ final class EscalationGuard
     }
 
     /**
-     * The class spatie reads wildcard permissions with for the user (`permission.wildcard_permission`),
-     * or null when wildcards are off (or the user has no HasRoles).
+     * The class spatie reads wildcard permissions with (`permission.wildcard_permission`), or null when
+     * wildcards are off. Read from the config, as {@see wildcardsEnabled()} is, so the roles list and
+     * the check agree on whether wildcards count. One that is not a spatie Wildcard is not used: spatie
+     * refuses it on every check anyway.
      *
      * @return class-string<Wildcard>|null
      */
-    private static function wildcardClass(mixed $user): ?string
+    private static function wildcardClass(): ?string
     {
-        if (! $user instanceof Model || ! method_exists($user, 'getWildcardClass')) {
+        if (! self::wildcardsEnabled()) {
             return null;
         }
 
-        $class = $user->getWildcardClass();
+        $class = config('permission.wildcard_permission') ?: WildcardPermission::class;
 
-        return is_string($class) && $class !== '' ? $class : null;
+        return is_string($class) && is_subclass_of($class, Wildcard::class) ? $class : null;
     }
 
     /**
      * Whether a permission name is covered by one of `$names`, by the rules of spatie's wildcard class.
      * The class builds its index from a record's permissions, so it is given a record that has only
      * `$names`: the user's own would also count the role being taken away. The index is built here,
-     * not taken from spatie's cache, as the check weighs what is stored now.
+     * not taken from spatie's cache, as the check weighs what is stored now. A custom class has to
+     * build it from `getAllPermissions()`, as spatie's does: the record has nothing else.
+     *
+     * A name spatie cannot read as a wildcard (`reports.`, `a..b`) covers only itself, as it would
+     * without wildcards, instead of failing the check.
      *
      * @param  class-string<Wildcard>  $class
      * @param  Collection<int, string>  $names
@@ -224,7 +235,36 @@ final class EscalationGuard
     private static function covers(string $class, Collection $names): Closure
     {
         $guard = Models::guard();
+        $names = $names->unique()->values();
+        $exact = collect();
 
+        try {
+            [$wildcard, $index] = self::wildcardIndex($class, $names, $guard);
+        } catch (WildcardPermissionNotProperlyFormatted) {
+            $exact = $names->reject(function (string $name) use ($class, $guard): bool {
+                try {
+                    self::wildcardIndex($class, collect([$name]), $guard);
+
+                    return true;
+                } catch (WildcardPermissionNotProperlyFormatted) {
+                    return false;
+                }
+            })->values();
+            [$wildcard, $index] = self::wildcardIndex($class, $names->diff($exact)->values(), $guard);
+        }
+
+        return fn (string $name): bool => $exact->contains($name) || $wildcard->implies($name, $guard, $index);
+    }
+
+    /**
+     * The wildcard class for a record that has only `$names`, and the index it builds from them.
+     *
+     * @param  class-string<Wildcard>  $class
+     * @param  Collection<int, string>  $names
+     * @return array{0: Wildcard, 1: array<mixed>}
+     */
+    private static function wildcardIndex(string $class, Collection $names, string $guard): array
+    {
         $record = new class extends Model
         {
             public Collection $held;
@@ -234,13 +274,12 @@ final class EscalationGuard
                 return $this->held;
             }
         };
-        $record->held = $names->unique()->values()->map(fn (string $name) => (object) ['name' => $name, 'guard_name' => $guard]);
+        $record->held = $names->map(fn (string $name) => (object) ['name' => $name, 'guard_name' => $guard]);
 
         /** @var Wildcard $wildcard */
         $wildcard = app($class, ['record' => $record]);
-        $index = $wildcard->getIndex();
 
-        return fn (string $name): bool => $wildcard->implies($name, $guard, $index);
+        return [$wildcard, $wildcard->getIndex()];
     }
 
     /**

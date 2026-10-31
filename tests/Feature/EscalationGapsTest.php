@@ -237,6 +237,21 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertSame(['*'], $admin->fresh()->permissions->pluck('name')->all());
     }
 
+    public function test_with_wildcards_a_name_spatie_cannot_read_as_a_wildcard_covers_only_itself(): void
+    {
+        // spatie cannot index `reports.`; the check weighs it as an exact name instead of failing.
+        config(['permission.enable_wildcard_permission' => true]);
+        $admin = $this->role('admin', ['*', 'view-roles', 'manage-roles', 'reports.']);
+        $user = $this->userWith()->assignRole($admin);
+        $ids = fn (string ...$names) => Permission::whereIn('name', $names)->pluck('id');
+
+        $this->assertSame([], EscalationGuard::locksOut($user, $admin, $ids('*', 'reports.'))->all());
+        $this->assertSame(
+            ['manage-permissions', 'manage-roles', 'view-permissions', 'view-roles'],
+            EscalationGuard::locksOut($user, $admin, $ids('reports.'))->all(),
+        );
+    }
+
     public function test_with_wildcards_a_gate_before_still_does_not_keep_the_access(): void
     {
         // The package cannot tell whether the Gate::before lets the user in because of this very role.
