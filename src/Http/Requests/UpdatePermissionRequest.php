@@ -55,7 +55,7 @@ class UpdatePermissionRequest extends FormRequest
 
         return [
             // Ignored as a model, so by its own key column (ignore() of a bare id looks at `id`).
-            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())->ignore($permission instanceof Model ? $permission : null)],
+            'name' => ['required', 'string', 'max:255', Rule::unique(Models::permissionClass(), 'name')->where('guard_name', Models::guard())->ignore($permission instanceof Model ? $permission : null), ...EscalationGuard::wildcardNameRule($permission instanceof \Spatie\Permission\Contracts\Permission ? $permission->name : null)],
         ];
     }
 }

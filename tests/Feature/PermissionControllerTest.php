@@ -38,4 +38,60 @@ class PermissionControllerTest extends TestCase
         $response->assertRedirectToRoute('admin.permissions.index');
         $this->assertModelMissing($permission);
     }
+
+    // ---------------------------------------------------------------- names spatie's wildcards cannot read
+
+    /** @return array<string, array{0: string}> */
+    public static function unreadableNames(): array
+    {
+        return ['trailing dot' => ['reports.'], 'empty part' => ['a..b'], 'empty subpart' => ['a,,b'], 'part of spaces' => ['posts. .edit']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unreadableNames')]
+    public function test_with_wildcards_a_name_spatie_cannot_read_is_refused(string $name): void
+    {
+        config(['permission.enable_wildcard_permission' => true]);
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+        $message = 'With wildcard permissions on, no part of the name may be empty or only spaces (as in "posts." or "posts..edit").';
+
+        $this->post(route('admin.permissions.store'), ['name' => $name])->assertSessionHasErrors(['name' => $message]);
+        $this->put(route('admin.permissions.update', $permission), ['name' => $name])->assertSessionHasErrors(['name' => $message]);
+
+        $this->assertDatabaseMissing('permissions', ['name' => $name]);
+        $this->assertSame('view-posts', $permission->fresh()->name);
+    }
+
+    public function test_with_wildcards_names_spatie_can_read_pass(): void
+    {
+        config(['permission.enable_wildcard_permission' => true]);
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+
+        $this->post(route('admin.permissions.store'), ['name' => 'posts.*'])->assertSessionHasNoErrors();
+        $this->put(route('admin.permissions.update', $permission), ['name' => 'posts.edit,view'])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('permissions', ['name' => 'posts.*']);
+        $this->assertSame('posts.edit,view', $permission->fresh()->name);
+    }
+
+    public function test_with_wildcards_a_stored_name_spatie_cannot_read_may_be_saved_unchanged(): void
+    {
+        // Stored before the check, or with wildcards off: the form still saves without renaming it.
+        config(['permission.enable_wildcard_permission' => true]);
+        $permission = Permission::create(['name' => 'a..b', 'guard_name' => 'web']);
+
+        $this->put(route('admin.permissions.update', $permission), ['name' => 'a..b'])->assertSessionHasNoErrors();
+        $this->put(route('admin.permissions.update', $permission), ['name' => 'a.b'])->assertSessionHasNoErrors();
+        $this->assertSame('a.b', $permission->fresh()->name);
+    }
+
+    public function test_without_wildcards_a_name_with_an_empty_part_is_only_a_name(): void
+    {
+        $permission = Permission::create(['name' => 'view-posts', 'guard_name' => 'web']);
+
+        $this->post(route('admin.permissions.store'), ['name' => 'reports.'])->assertSessionHasNoErrors();
+        $this->put(route('admin.permissions.update', $permission), ['name' => 'a..b'])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('permissions', ['name' => 'reports.']);
+        $this->assertSame('a..b', $permission->fresh()->name);
+    }
 }
