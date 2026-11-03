@@ -2,7 +2,7 @@ import { router } from "@inertiajs/vue3";
 import { nextTick, onScopeDispose, reactive, ref } from "vue";
 
 import { r } from "./config";
-import { focusAfterDelete, focusClicked } from "./focus";
+import { focusAfterDelete } from "./focus";
 
 /**
  * How long a delete may go without an answer before the modal lets the user stop it. A delete takes
@@ -36,7 +36,8 @@ export function useDeleteConfirmation(routeName: string) {
     let openerIndex = 0;
 
     const confirmDelete = (row: DeletableRow, index: number, event: MouseEvent) => {
-        opener = focusClicked(event);
+        // Not focused: the modal finds it itself, also where a click does not focus a button (Safari).
+        opener = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
         openerIndex = index;
         deleteForm.id = row.id;
         deleteForm.name = row.name;
