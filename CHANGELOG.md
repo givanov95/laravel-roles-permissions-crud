@@ -23,6 +23,12 @@
   the counts, which said "in use" for the user's own role when `allow_delete_in_use` let deletes in use
   through and the delete was refused because it would lock them out.
 
+### Changed
+- **One delete confirmation for both lists.** `RolesManager` and `PermissionsManager` share the
+  confirmation's state, the delete request and the focus afterwards (`useDeleteConfirmation()`), and
+  its modal (`DeleteConfirmationModal`), instead of a copy each. Both are internal, not exported, and
+  the lists behave as before.
+
 ### Fixed
 - **With wildcard permissions, a permission that covers a protected one is protected.** With
   `enable_wildcard_permission` on, only the exact protected names were kept from a rename or a delete.
