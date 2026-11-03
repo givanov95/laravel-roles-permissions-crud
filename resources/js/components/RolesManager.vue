@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import type { LaravelDataTablePayload } from "@givanov95/vue-data-table/tanstack";
 import { useLaravelDataTable } from "@givanov95/vue-data-table/tanstack";
-import { Link, router, useForm } from "@inertiajs/vue3";
-import { nextTick, ref } from "vue";
+import { Link } from "@inertiajs/vue3";
 
 import { r, t } from "../config";
-import { focusAfterDelete, focusClicked } from "../focus";
 import { useServerPage } from "../page";
+import { useDeleteConfirmation } from "../useDeleteConfirmation";
 import ListFooter from "./ui/ListFooter.vue";
 import SortableHeader from "./ui/SortableHeader.vue";
-import ConfirmationModal from "./ui/ConfirmationModal.vue";
-import DangerButton from "./ui/DangerButton.vue";
+import DeleteConfirmationModal from "./ui/DeleteConfirmationModal.vue";
 import PrimaryButton from "./ui/PrimaryButton.vue";
 import RefusedDeleteButton from "./ui/RefusedDeleteButton.vue";
-import SecondaryButton from "./ui/SecondaryButton.vue";
 
 interface Role {
     id: number | string;
@@ -43,53 +40,8 @@ const props = defineProps<{
 const table = useLaravelDataTable<Role>(() => props.dataTable);
 const { canCreate } = useServerPage();
 
-const showDeleteModal = ref(false);
-const deleteForm = useForm<{ id: number | string | null; name: string }>({ id: null, name: "" });
-
-/** The heading and the rows, for the focus after a delete. */
-const heading = ref<HTMLElement | null>(null);
-const rows = ref<HTMLTableSectionElement | null>(null);
-
-/** The Delete that opened the confirmation and its row's place on the page. */
-let opener: HTMLElement | null = null;
-let openerIndex = 0;
-
-const confirmDelete = (role: Role, index: number, event: MouseEvent) => {
-    opener = focusClicked(event);
-    openerIndex = index;
-    deleteForm.id = role.id;
-    deleteForm.name = role.name;
-    showDeleteModal.value = true;
-};
-
-/** Set while a delete is on its way: the modal stays open (and its form kept) until it is done. */
-const deleting = ref(false);
-
-const closeModal = () => {
-    if (deleting.value) return;
-    // The form is not reset: the fading modal would read `delete ""`, and the next confirmDelete
-    // fills it again anyway.
-    showDeleteModal.value = false;
-};
-
-const destroy = () => {
-    if (deleting.value) return;
-    // `router.delete` does not set `deleteForm.processing`, so the modal keeps its own flag. Set in
-    // `onStart`, which Inertia calls only for a visit that goes ahead (not one a `before` listener stops).
-    router.delete(r("roles.destroy", deleteForm.id as number | string) as string, {
-        preserveScroll: true,
-        onStart: () => {
-            deleting.value = true;
-        },
-        onFinish: () => {
-            deleting.value = false;
-            closeModal();
-            // After the render: the deleted row is gone by then, and the modal has given the focus
-            // back to its Delete when it is still there.
-            void nextTick(() => focusAfterDelete(opener, rows.value, openerIndex, heading.value));
-        },
-    });
-};
+const { showDeleteModal, deleteForm, deleting, heading, rows, confirmDelete, closeModal, destroy } =
+    useDeleteConfirmation("roles.destroy");
 </script>
 
 <template>
@@ -183,31 +135,13 @@ const destroy = () => {
 
         <ListFooter :meta="table.meta" @page="table.goToPage" />
 
-        <ConfirmationModal :show="showDeleteModal" @close="closeModal">
-            <template #title>{{ t('Delete role') }}</template>
-            <template #content>
-                {{ t('Are you sure you want to delete') }} "{{ deleteForm.name }}"?
-            </template>
-            <template #footer>
-                <!-- aria-disabled, not disabled: the focused button keeps the focus while the delete runs
-                     (a disabled one drops it to the body); closeModal and destroy ignore a key press.
-                     No pointer events, so the buttons do not light up on hover or press either. -->
-                <SecondaryButton
-                    :aria-disabled="deleting || undefined"
-                    :class="{ 'pointer-events-none opacity-25': deleting }"
-                    @click="closeModal"
-                >
-                    {{ t('Cancel') }}
-                </SecondaryButton>
-                <DangerButton
-                    class="ms-3"
-                    :aria-disabled="deleting || undefined"
-                    :class="{ 'pointer-events-none opacity-25': deleting }"
-                    @click="destroy"
-                >
-                    {{ t('Delete') }}
-                </DangerButton>
-            </template>
-        </ConfirmationModal>
+        <DeleteConfirmationModal
+            :show="showDeleteModal"
+            :title="t('Delete role')"
+            :name="deleteForm.name"
+            :deleting="deleting"
+            @close="closeModal"
+            @confirm="destroy"
+        />
     </div>
 </template>
