@@ -236,9 +236,13 @@ final class EscalationGuard
      */
     public static function unreadableWildcardNames(?RoleContract $role, Collection $requested): Collection
     {
+        if (! self::wildcardsEnabled()) {
+            return collect();
+        }
+
         $added = $requested->diff($role === null ? collect() : Models::keys($role->permissions));
 
-        if (! self::wildcardsEnabled() || $added->isEmpty()) {
+        if ($added->isEmpty()) {
             return collect();
         }
 

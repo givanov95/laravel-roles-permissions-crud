@@ -40,8 +40,8 @@
   wildcards are on, spatie fails for whoever has one before the screens are reached, so rename it with
   wildcards off. Without wildcards names are validated as before.
   The role form does not give a role such a permission either (one already stored), with another string
-  to translate: `With wildcard permissions on, :permissions cannot be given: no part of the name may
-  be empty or only spaces. Rename it first.` A role that already has one is saved as before.
+  to translate: `With wildcard permissions on, a permission whose name has a part that is empty or only
+  spaces cannot be given until it is renamed: :permissions.` A role that already has one is saved as before.
   `EscalationGuard::readsAsWildcard()`, `wildcardNameRule()` and `unreadableWildcardNames()` give the
   same checks to an application's own forms.
 - **A delete that does not end normally no longer leaves the list guessing.** Since the delete modal

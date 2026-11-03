@@ -48,7 +48,7 @@ trait ChecksPermissionGrants
             $unreadable = EscalationGuard::unreadableWildcardNames($role, $requested);
 
             if ($unreadable->isNotEmpty()) {
-                $validator->errors()->add('permissions', __('With wildcard permissions on, :permissions cannot be given: no part of the name may be empty or only spaces. Rename it first.', [
+                $validator->errors()->add('permissions', __('With wildcard permissions on, a permission whose name has a part that is empty or only spaces cannot be given until it is renamed: :permissions.', [
                     'permissions' => $unreadable->implode(', '),
                 ]));
 

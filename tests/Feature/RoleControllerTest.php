@@ -81,7 +81,7 @@ class RoleControllerTest extends TestCase
         // Stored before the check, or while wildcards were off.
         $unreadable = Permission::create(['name' => 'a..b', 'guard_name' => 'web']);
         $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
-        $message = 'With wildcard permissions on, a..b cannot be given: no part of the name may be empty or only spaces. Rename it first.';
+        $message = 'With wildcard permissions on, a permission whose name has a part that is empty or only spaces cannot be given until it is renamed: a..b.';
 
         $this->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$unreadable->id]])
             ->assertSessionHasErrors(['permissions' => $message]);
