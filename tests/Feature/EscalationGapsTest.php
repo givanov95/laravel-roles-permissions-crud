@@ -387,6 +387,27 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertFalse(EscalationGuard::isProtectedPermission(Permission::findByName('reports.*')));
     }
 
+    public function test_with_wildcards_a_covering_permission_given_straight_to_a_user_or_covering_a_protected_role_is_protected(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.protected_roles' => ['publisher'],
+        ]);
+        $this->role('publisher', ['posts.publish']);
+        $this->role('editor', ['posts.*']);
+        // Given to nobody but this user, straight: in use through `direct_count` only.
+        $user = $this->userWith(['*', 'view-permissions', 'manage-permissions']);
+
+        $rows = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'));
+        $this->assertTrue($rows->firstWhere('name', '*')['is_protected']);
+        $this->assertTrue($rows->firstWhere('name', 'posts.*')['is_protected']);
+
+        $this->actingAs($user)->delete(route('admin.permissions.destroy', Permission::findByName('*')))
+            ->assertInertiaFlash('toast.message', 'This permission is protected and cannot be deleted.');
+        $this->assertModelExists(Permission::findByName('*'));
+    }
+
     public function test_without_wildcards_a_star_is_an_ordinary_name(): void
     {
         config(['roles-permissions-crud.allow_delete_in_use' => true]);

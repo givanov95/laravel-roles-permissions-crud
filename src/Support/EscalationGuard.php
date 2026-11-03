@@ -481,7 +481,7 @@ final class EscalationGuard
 
         $wildcards = self::wildcardClass();
 
-        if ($wildcards === null || $names === []) {
+        if ($wildcards === null || $names === [] || $inUse === false) {
             return false;
         }
 

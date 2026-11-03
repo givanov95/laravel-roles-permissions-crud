@@ -95,9 +95,11 @@ class PermissionController extends Controller
 
     public function destroy(Permission $permission): RedirectResponse
     {
-        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
+        $inUse = EscalationGuard::permissionInUse($permission);
 
-        $refusal = EscalationGuard::permissionDeleteRefusal($permission);
+        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission, null, $inUse), 403);
+
+        $refusal = EscalationGuard::permissionDeleteRefusal($permission, null, $inUse);
 
         if ($refusal !== null) {
             Inertia::flash('toast', ['type' => 'error', 'message' => $refusal]);
