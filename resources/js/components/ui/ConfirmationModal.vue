@@ -40,10 +40,21 @@ const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length -
 let clicked: { element: HTMLElement; at: number } | null = null;
 const CLICKED_FOR_MS = 1000;
 
+/** What a click can open a modal from: anything focusable, also a `tabindex="-1"` menu item. */
+const CLICKABLE = `${FOCUSABLE},[tabindex]`;
+
 const onDocumentClick = (event: MouseEvent) => {
-    // The element itself, also inside a web component's shadow root (the event's target is its host).
-    const origin = event.composedPath()[0];
-    const element = origin instanceof Element ? origin.closest<HTMLElement>(FOCUSABLE) : null;
+    // Not a click the browser made up (Enter or Space on a button, Enter in a form's field, `click()`):
+    // the focused element is the opener then, as the user left it.
+    if (event.detail === 0) {
+        clicked = null;
+        return;
+    }
+    // The innermost element along the path, also inside a web component's shadow root (the event's
+    // target is its host).
+    const element = event
+        .composedPath()
+        .find((target): target is HTMLElement => target instanceof HTMLElement && target.matches(CLICKABLE));
     clicked = element ? { element, at: performance.now() } : null;
 };
 
