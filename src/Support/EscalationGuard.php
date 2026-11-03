@@ -393,7 +393,7 @@ final class EscalationGuard
      */
     public static function permissionDeleteRefusal(PermissionContract $permission, ?array $protectedNames = null, ?bool $inUse = null): ?string
     {
-        if (in_array($permission->name, $protectedNames ?? self::protectedPermissionNames(), true)) {
+        if (self::isProtectedPermission($permission, $protectedNames)) {
             return __('This permission is protected and cannot be deleted.');
         }
 
@@ -461,8 +461,39 @@ final class EscalationGuard
     }
 
     /**
+     * Whether a permission cannot be renamed or deleted: its name is one of
+     * {@see protectedPermissionNames()}, or, with spatie's wildcards on, it covers one of them by the
+     * wildcard class's rules (`*`, `roles.*` for `roles.manage`). Such a wildcard may be what lets the
+     * user into the screens, and deleting or renaming it takes that away from every role and user that
+     * has it. A name spatie cannot read as a wildcard covers only itself. For many permissions, pass the
+     * protected names, so they are read once.
+     *
+     * @param  array<int, string>|null  $protectedNames
+     */
+    public static function isProtectedPermission(PermissionContract $permission, ?array $protectedNames = null): bool
+    {
+        $names = $protectedNames ?? self::protectedPermissionNames();
+
+        if (in_array($permission->name, $names, true)) {
+            return true;
+        }
+
+        $wildcards = self::wildcardClass();
+
+        if ($wildcards === null || $names === []) {
+            return false;
+        }
+
+        $covers = self::covers($wildcards, collect([$permission->name]));
+
+        return collect($names)->contains(fn (string $name): bool => $covers($name));
+    }
+
+    /**
      * Permissions that cannot be renamed or deleted: the ones that guard the screens, the ones listed
      * in `protected_permissions`, and, while escalation is prevented, the ones a protected role holds.
+     * With wildcards on, a permission that covers one of these is protected as well; ask
+     * {@see isProtectedPermission()} for a permission.
      *
      * @return array<int, string>
      */

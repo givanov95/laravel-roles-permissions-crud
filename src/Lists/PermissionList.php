@@ -73,7 +73,7 @@ class PermissionList extends ServerList
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Permission $model */
-        $isProtected = in_array($model->name, $this->protected, true);
+        $isProtected = EscalationGuard::isProtectedPermission($model, $this->protected);
         // As EscalationGuard::permissionInUse() sees it: given to a role or straight to anyone. (Inside a
         // team the counts are the team's, but there permissions are read-only anyway.)
         $inUse = (int) $model->getAttribute('roles_count') > 0 || (int) $model->getAttribute('direct_count') > 0;

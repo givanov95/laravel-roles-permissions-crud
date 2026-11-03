@@ -114,6 +114,6 @@ class PermissionController extends Controller
 
     protected function isProtected(Permission $permission): bool
     {
-        return in_array($permission->name, EscalationGuard::protectedPermissionNames(), true);
+        return EscalationGuard::isProtectedPermission($permission);
     }
 }
