@@ -393,7 +393,7 @@ final class EscalationGuard
      */
     public static function permissionDeleteRefusal(PermissionContract $permission, ?array $protectedNames = null, ?bool $inUse = null): ?string
     {
-        if (self::isProtectedPermission($permission, $protectedNames)) {
+        if (self::isProtectedPermission($permission, $protectedNames, $inUse)) {
             return __('This permission is protected and cannot be deleted.');
         }
 
@@ -463,14 +463,15 @@ final class EscalationGuard
     /**
      * Whether a permission cannot be renamed or deleted: its name is one of
      * {@see protectedPermissionNames()}, or, with spatie's wildcards on, it covers one of them by the
-     * wildcard class's rules (`*`, `roles.*` for `roles.manage`). Such a wildcard may be what lets the
-     * user into the screens, and deleting or renaming it takes that away from every role and user that
-     * has it. A name spatie cannot read as a wildcard covers only itself. For many permissions, pass the
-     * protected names, so they are read once.
+     * wildcard class's rules (`*`, `roles.*` for `roles.manage`) and is given to a role or straight to
+     * anyone. Such a wildcard may be what lets people into the screens, and deleting or renaming it
+     * takes that away from every role and user that has it; one that nobody has locks nobody out, so a
+     * stray `*` can still be removed. A name spatie cannot read as a wildcard covers only itself. For
+     * many permissions, pass the protected names and `$inUse` (from a list's counts).
      *
      * @param  array<int, string>|null  $protectedNames
      */
-    public static function isProtectedPermission(PermissionContract $permission, ?array $protectedNames = null): bool
+    public static function isProtectedPermission(PermissionContract $permission, ?array $protectedNames = null, ?bool $inUse = null): bool
     {
         $names = $protectedNames ?? self::protectedPermissionNames();
 
@@ -486,7 +487,8 @@ final class EscalationGuard
 
         $covers = self::covers($wildcards, collect([$permission->name]));
 
-        return collect($names)->contains(fn (string $name): bool => $covers($name));
+        return collect($names)->contains(fn (string $name): bool => $covers($name))
+            && ($inUse ?? self::permissionInUse($permission));
     }
 
     /**
@@ -501,7 +503,8 @@ final class EscalationGuard
     {
         $names = [
             ...Authorizer::guardingPermissions(),
-            ...array_values((array) config('roles-permissions-crud.protected_permissions', [])),
+            // As the config has it: what is not a name (an unset env value) protects nothing.
+            ...array_values(array_filter((array) config('roles-permissions-crud.protected_permissions', []), 'is_string')),
         ];
 
         if (self::enabled() && self::protectedRoles() !== []) {

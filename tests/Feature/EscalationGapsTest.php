@@ -355,6 +355,38 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertModelMissing($posts);
     }
 
+    public function test_with_wildcards_a_covering_permission_nobody_has_may_be_deleted(): void
+    {
+        // A stray `*` locks nobody out: it is protected only once a role or a user has it.
+        config(['permission.enable_wildcard_permission' => true]);
+        $star = Permission::findOrCreate('*', 'web');
+        $manager = $this->permissionManager();
+
+        $this->assertFalse(EscalationGuard::isProtectedPermission($star));
+
+        $row = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', '*');
+        $this->assertFalse($row['is_protected']);
+        $this->assertTrue($row['can_delete']);
+
+        $this->actingAs($manager)->delete(route('admin.permissions.destroy', $star))
+            ->assertInertiaFlash('toast.type', 'success');
+        $this->assertModelMissing($star);
+    }
+
+    public function test_with_wildcards_a_permission_that_covers_a_listed_protected_one_is_protected(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.protected_permissions' => ['posts.publish', null],
+        ]);
+        $this->role('editor', ['posts.*', 'reports.*']);
+
+        $this->assertTrue(EscalationGuard::isProtectedPermission(Permission::findByName('posts.*')));
+        $this->assertFalse(EscalationGuard::isProtectedPermission(Permission::findByName('reports.*')));
+    }
+
     public function test_without_wildcards_a_star_is_an_ordinary_name(): void
     {
         config(['roles-permissions-crud.allow_delete_in_use' => true]);
