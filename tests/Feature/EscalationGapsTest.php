@@ -275,6 +275,152 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertSame(['manage-roles', 'view-roles'], EscalationGuard::locksOut($user, $admin, collect())->all());
     }
 
+    // ---------------------------------------------------------------- a wildcard that covers a protected permission
+
+    public function test_with_wildcards_a_permission_that_covers_every_guarding_one_is_protected(): void
+    {
+        // The admin's only way in is `*`: deleting or renaming it would take the screens from everyone.
+        config(['permission.enable_wildcard_permission' => true, 'roles-permissions-crud.allow_delete_in_use' => true]);
+        $admin = $this->role('admin', ['*']);
+        $user = $this->userWith()->assignRole($admin);
+        $star = Permission::findByName('*');
+
+        $row = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', '*');
+        $this->assertTrue($row['is_protected']);
+        $this->assertFalse($row['can_delete']);
+        $this->assertSame('This permission is protected and cannot be deleted.', $row['delete_refusal']);
+
+        $this->actingAs($user)->getJson(route('admin.permissions.edit', $star), $this->inertia())
+            ->assertJsonPath('props.permission.is_protected', true);
+        $this->actingAs($user)->put(route('admin.permissions.update', $star), ['name' => 'everything'])
+            ->assertSessionHasErrors(['name' => 'This permission is protected; its name cannot be changed.']);
+        $this->actingAs($user)->delete(route('admin.permissions.destroy', $star))
+            ->assertInertiaFlash('toast.message', 'This permission is protected and cannot be deleted.');
+
+        $this->assertSame('*', $star->fresh()->name);
+        $this->assertTrue($admin->fresh()->hasPermissionTo('*'));
+    }
+
+    public function test_with_wildcards_a_permission_that_covers_a_guarding_one_by_its_parts_is_protected(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.authorize_permissions.roles' => ['view' => 'roles.view', 'manage' => 'roles.manage'],
+        ]);
+        $this->role('roles-anything', ['roles.*']);
+        $wildcard = Permission::findByName('roles.*');
+        $manager = $this->permissionManager('roles.*');
+
+        $this->assertTrue(EscalationGuard::isProtectedPermission($wildcard));
+        $this->assertSame('This permission is protected and cannot be deleted.', EscalationGuard::permissionDeleteRefusal($wildcard));
+
+        $this->actingAs($manager)->put(route('admin.permissions.update', $wildcard), ['name' => 'roles.view'])
+            ->assertSessionHasErrors(['name' => 'This permission is protected; its name cannot be changed.']);
+        $this->actingAs($manager)->delete(route('admin.permissions.destroy', $wildcard))
+            ->assertInertiaFlash('toast.type', 'error');
+
+        $this->assertModelExists($wildcard);
+        $this->assertSame('roles.*', $wildcard->fresh()->name);
+    }
+
+    public function test_with_wildcards_a_permission_that_covers_nothing_protected_may_be_renamed_and_deleted(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.authorize_permissions.roles' => ['view' => 'roles.view', 'manage' => 'roles.manage'],
+        ]);
+        $this->role('editor', ['posts.*', 'reports.']);
+        $posts = Permission::findByName('posts.*');
+        // spatie cannot read `reports.` as a wildcard: it covers only itself.
+        $reports = Permission::findByName('reports.');
+        $manager = $this->permissionManager('posts.*');
+
+        $this->assertFalse(EscalationGuard::isProtectedPermission($posts));
+        $this->assertFalse(EscalationGuard::isProtectedPermission($reports));
+
+        $row = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', 'posts.*');
+        $this->assertFalse($row['is_protected']);
+        $this->assertTrue($row['can_delete']);
+
+        $this->actingAs($manager)->put(route('admin.permissions.update', $posts), ['name' => 'posts.edit'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('posts.edit', $posts->fresh()->name);
+
+        $this->actingAs($manager)->delete(route('admin.permissions.destroy', $posts))
+            ->assertInertiaFlash('toast.type', 'success');
+        $this->assertModelMissing($posts);
+    }
+
+    public function test_with_wildcards_a_covering_permission_nobody_has_may_be_deleted(): void
+    {
+        // A stray `*` locks nobody out: it is protected only once a role or a user has it.
+        config(['permission.enable_wildcard_permission' => true]);
+        $star = Permission::findOrCreate('*', 'web');
+        $manager = $this->permissionManager();
+
+        $this->assertFalse(EscalationGuard::isProtectedPermission($star));
+
+        $row = collect($this->actingAs($manager)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'))
+            ->firstWhere('name', '*');
+        $this->assertFalse($row['is_protected']);
+        $this->assertTrue($row['can_delete']);
+
+        $this->actingAs($manager)->delete(route('admin.permissions.destroy', $star))
+            ->assertInertiaFlash('toast.type', 'success');
+        $this->assertModelMissing($star);
+    }
+
+    public function test_with_wildcards_a_permission_that_covers_a_listed_protected_one_is_protected(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.protected_permissions' => ['posts.publish', null],
+        ]);
+        $this->role('editor', ['posts.*', 'reports.*']);
+
+        $this->assertTrue(EscalationGuard::isProtectedPermission(Permission::findByName('posts.*')));
+        $this->assertFalse(EscalationGuard::isProtectedPermission(Permission::findByName('reports.*')));
+    }
+
+    public function test_with_wildcards_a_covering_permission_given_straight_to_a_user_or_covering_a_protected_role_is_protected(): void
+    {
+        config([
+            'permission.enable_wildcard_permission' => true,
+            'roles-permissions-crud.allow_delete_in_use' => true,
+            'roles-permissions-crud.protected_roles' => ['publisher'],
+        ]);
+        $this->role('publisher', ['posts.publish']);
+        $this->role('editor', ['posts.*']);
+        // Given to nobody but this user, straight: in use through `direct_count` only.
+        $user = $this->userWith(['*', 'view-permissions', 'manage-permissions']);
+
+        $rows = collect($this->actingAs($user)->getJson(route('admin.permissions.index'), $this->inertia())->json('props.dataTable.data'));
+        $this->assertTrue($rows->firstWhere('name', '*')['is_protected']);
+        $this->assertTrue($rows->firstWhere('name', 'posts.*')['is_protected']);
+
+        $this->actingAs($user)->delete(route('admin.permissions.destroy', Permission::findByName('*')))
+            ->assertInertiaFlash('toast.message', 'This permission is protected and cannot be deleted.');
+        $this->assertModelExists(Permission::findByName('*'));
+    }
+
+    public function test_without_wildcards_a_star_is_an_ordinary_name(): void
+    {
+        config(['roles-permissions-crud.allow_delete_in_use' => true]);
+        $this->role('admin', ['*']);
+        $star = Permission::findByName('*');
+
+        $this->assertFalse(EscalationGuard::isProtectedPermission($star));
+
+        $this->actingAs($this->permissionManager('*'))->delete(route('admin.permissions.destroy', $star))
+            ->assertInertiaFlash('toast.type', 'success');
+        $this->assertModelMissing($star);
+    }
+
     // ---------------------------------------------------------------- deleting what is in use
 
     public function test_a_role_assigned_to_a_user_is_not_deleted(): void

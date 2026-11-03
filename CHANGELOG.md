@@ -24,6 +24,15 @@
   through and the delete was refused because it would lock them out.
 
 ### Fixed
+- **With wildcard permissions, a permission that covers a protected one is protected.** With
+  `enable_wildcard_permission` on, only the exact protected names were kept from a rename or a delete.
+  A role whose only way into the screens was `*` (or `roles.*` for `roles.manage`) could lose it: with
+  `allow_delete_in_use`, deleting `*` took it from every role, and `*` could be renamed while in use,
+  since it covers any new name. A permission that covers a protected name by the rules of spatie's
+  wildcard class is now protected as well while a role or a user has it: the lists show it as
+  protected with the reason, the delete is refused, and the form keeps its name. One that nobody has
+  locks nobody out and can still be deleted. `EscalationGuard::isProtectedPermission()` answers this
+  for one permission. A name spatie cannot read as a wildcard (`reports.`) covers only itself.
 - **The lock-out check reads spatie's wildcard permissions.** With `enable_wildcard_permission` on, a
   user with `*`, or `roles.*` through another role, was refused taking `roles.manage` away from their own
   role or deleting it, though they kept the access. The other way round, a role with only `*` was not

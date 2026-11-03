@@ -73,7 +73,7 @@ class PermissionController extends Controller
             'permission' => [
                 'id'           => $permission->getKey(),
                 'name'         => $permission->name,
-                'is_protected' => $this->isProtected($permission),
+                'is_protected' => $this->isProtected($permission, $inUse),
                 // A rename hands the new name to everyone who has the permission, so one in use is renamed
                 // only by a user who may use every permission; the form locks the name for the rest.
                 'can_rename'   => EscalationGuard::canRenamePermissionAtAll(request()->user(), $permission, $inUse),
@@ -95,9 +95,11 @@ class PermissionController extends Controller
 
     public function destroy(Permission $permission): RedirectResponse
     {
-        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission), 403);
+        $inUse = EscalationGuard::permissionInUse($permission);
 
-        $refusal = EscalationGuard::permissionDeleteRefusal($permission);
+        abort_unless(EscalationGuard::canManagePermission(request()->user(), $permission, null, $inUse), 403);
+
+        $refusal = EscalationGuard::permissionDeleteRefusal($permission, null, $inUse);
 
         if ($refusal !== null) {
             Inertia::flash('toast', ['type' => 'error', 'message' => $refusal]);
@@ -112,8 +114,8 @@ class PermissionController extends Controller
         return $this->redirectToIndex('permissions');
     }
 
-    protected function isProtected(Permission $permission): bool
+    protected function isProtected(Permission $permission, ?bool $inUse = null): bool
     {
-        return in_array($permission->name, EscalationGuard::protectedPermissionNames(), true);
+        return EscalationGuard::isProtectedPermission($permission, null, $inUse);
     }
 }

@@ -73,10 +73,12 @@ class PermissionList extends ServerList
     protected function row(Model $model, Request $request): array
     {
         /** @var Model&Permission $model */
-        $isProtected = in_array($model->name, $this->protected, true);
         // As EscalationGuard::permissionInUse() sees it: given to a role or straight to anyone. (Inside a
         // team the counts are the team's, but there permissions are read-only anyway.)
         $inUse = (int) $model->getAttribute('roles_count') > 0 || (int) $model->getAttribute('direct_count') > 0;
+        // Inside a team the counts are the team's: whether a covering wildcard is in use is asked of the
+        // whole set-up, as the form asks it.
+        $isProtected = EscalationGuard::isProtectedPermission($model, $this->protected, Models::inTeam() ? null : $inUse);
         // Whether the user may open, edit and delete it: the manage permission, and the permission not
         // reaching roles or users beyond them.
         $canManage = $this->mayManage
