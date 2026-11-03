@@ -34,7 +34,8 @@
   locks while its request runs, a delete that got no answer (a lost connection, a lock in the database)
   kept the modal open until the page was reloaded. After 5 seconds without an answer, Cancel (and
   Escape or a click outside) now stops the request; the modal closes and the list is read again, since
-  the server may have deleted the record anyway. A delete is also no longer cancelled by another visit,
+  the server may have deleted the record anyway. The list is read again as well when the delete ends
+  without an answer for another reason (a lost connection). A delete is also no longer cancelled by another visit,
   such as the list's search after its debounce: that closed the modal as if the delete had ended, while
   the server might have deleted the record. The delete is now an async visit (with the progress bar),
   in `RolesManager` and `PermissionsManager` alike.

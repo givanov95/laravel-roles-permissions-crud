@@ -49,6 +49,8 @@ export function useDeleteConfirmation(routeName: string) {
     /** Set when the delete has gone {@link STUCK_AFTER_MS} without an answer: closing the modal stops it. */
     const stuck = ref(false);
     let stopDelete: (() => void) | null = null;
+    /** Whether the delete was stopped from the modal (not by Inertia, e.g. on the browser's Back). */
+    let stoppedByUser = false;
     let stuckTimer: ReturnType<typeof setTimeout> | undefined;
 
     onScopeDispose(() => clearTimeout(stuckTimer));
@@ -56,7 +58,10 @@ export function useDeleteConfirmation(routeName: string) {
     const closeModal = () => {
         if (deleting.value) {
             // Inertia then calls onFinish, which closes the modal.
-            if (stuck.value) stopDelete?.();
+            if (stuck.value && stopDelete) {
+                stoppedByUser = true;
+                stopDelete();
+            }
             return;
         }
         // The form is not reset: the fading modal would read `delete ""`, and the next confirmDelete
@@ -64,8 +69,14 @@ export function useDeleteConfirmation(routeName: string) {
         showDeleteModal.value = false;
     };
 
+    /** Moves the focus off a row the delete took away (see {@link focusAfterDelete}), after the render. */
+    const focusAfter = () => void nextTick(() => focusAfterDelete(opener, rows.value, openerIndex, heading.value));
+
     const destroy = () => {
         if (deleting.value || deleteForm.id === null) return;
+        // Whether the server answered: with a page (the list, the form's errors) or an error response.
+        let answered = false;
+        stoppedByUser = false;
         // The modal keeps its own flag, set in `onStart`, which Inertia calls only for a visit that goes
         // ahead (not one a `before` listener stops).
         router.delete(r(routeName, deleteForm.id) as string, {
@@ -78,6 +89,15 @@ export function useDeleteConfirmation(routeName: string) {
             onCancelToken: ({ cancel }) => {
                 stopDelete = cancel;
             },
+            onSuccess: () => {
+                answered = true;
+            },
+            onError: () => {
+                answered = true;
+            },
+            onHttpException: () => {
+                answered = true;
+            },
             onStart: () => {
                 deleting.value = true;
                 stuckTimer = setTimeout(() => (stuck.value = true), STUCK_AFTER_MS);
@@ -88,11 +108,18 @@ export function useDeleteConfirmation(routeName: string) {
                 stopDelete = null;
                 deleting.value = false;
                 closeModal();
-                // Stopped by the user: the server may still have deleted it, so the list is read again.
-                if (visit.cancelled) router.reload();
+                // Ended without a page: stopped from the modal, a lost connection, or a redirect Inertia
+                // drops for an async visit after a deploy (a new asset version). The server may still
+                // have deleted the record, so the list is read again: with a plain visit, which shows the
+                // progress bar and loads the whole page on a new version (`router.reload()` is async and
+                // would drop it too). Not when Inertia cancelled it itself (the browser's Back).
+                if (!answered && (stoppedByUser || !visit.cancelled)) {
+                    router.visit(window.location.href, { preserveScroll: true, preserveState: true, onFinish: focusAfter });
+                    return;
+                }
                 // After the render: the deleted row is gone by then, and the modal has given the focus
                 // back to its Delete when it is still there.
-                void nextTick(() => focusAfterDelete(opener, rows.value, openerIndex, heading.value));
+                focusAfter();
             },
         });
     };
