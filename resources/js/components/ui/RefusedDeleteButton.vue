@@ -2,7 +2,6 @@
 import { ref } from "vue";
 
 import { t } from "../../config";
-import { focusClicked } from "../../focus";
 import ConfirmationModal from "./ConfirmationModal.vue";
 import SecondaryButton from "./SecondaryButton.vue";
 
@@ -19,9 +18,8 @@ defineProps<{
 
 const show = ref(false);
 
-// Focused first, so the dialog gives the focus back to it on close (see focusClicked).
-const open = (event: MouseEvent) => {
-    focusClicked(event);
+// The dialog gives the focus back to this button on close, also where a click does not focus it.
+const open = () => {
     show.value = true;
 };
 </script>

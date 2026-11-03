@@ -28,6 +28,52 @@ let bodyOverflow = "";
 
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
 
+/**
+ * The button or link last clicked, and when. Safari, and Firefox on macOS, do not focus a button on a
+ * click, so a modal opened from one finds the focus on the body (or still on an element focused
+ * before): it takes the clicked one as its opener instead, to give the focus back to on close. Only
+ * when clicked just before (a modal opened later, by a timer or a response, has no button of its
+ * own). A click, not a press: a right click, a drag or a long press is not what opened it, and the
+ * click comes as late as possible. Listened to as soon as the module loads in the browser, before any
+ * modal is mounted (an application may mount one only when it opens).
+ */
+let clicked: { element: HTMLElement; at: number } | null = null;
+const CLICKED_FOR_MS = 1000;
+
+/** What a click can open a modal from: anything focusable, also a `tabindex="-1"` menu item. */
+const CLICKABLE = `${FOCUSABLE},[tabindex]`;
+
+const onDocumentClick = (event: MouseEvent) => {
+    // Not a click the browser made up (Enter or Space on a button, Enter in a form's field, `click()`):
+    // the focused element is the opener then, as the user left it.
+    if (event.detail === 0) {
+        clicked = null;
+        return;
+    }
+    // The innermost element along the path, also inside a web component's shadow root (the event's
+    // target is its host).
+    const element = event
+        .composedPath()
+        .find((target): target is HTMLElement => target instanceof HTMLElement && target.matches(CLICKABLE));
+    clicked = element ? { element, at: performance.now() } : null;
+};
+
+// Capture: a handler that stops the click on its way down does not hide it.
+if (typeof document !== "undefined") document.addEventListener("click", onDocumentClick, true);
+
+/**
+ * The element that opens a modal now: the one just clicked, else the focused one (a modal opened from
+ * the keyboard). Not one that is gone or inert (a button of a modal that has just closed).
+ */
+const currentOpener = (): HTMLElement | null => {
+    const usable = (element: Element | null): element is HTMLElement =>
+        element instanceof HTMLElement && element !== document.body && element.isConnected && !element.closest("[inert]");
+    const fresh = clicked && performance.now() - clicked.at < CLICKED_FOR_MS ? clicked.element : null;
+    if (usable(fresh)) return fresh;
+    const active = document.activeElement;
+    return usable(active) ? active : null;
+};
+
 /** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
 const MAX_WIDTHS: Record<ConfirmationModalMaxWidth, string> = {
     sm: "max-w-sm",
@@ -66,7 +112,7 @@ const contentId = ref<string>();
 const dialog = ref<HTMLDialogElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
 
-/** The element that had focus when the modal opened (usually the button that opened it). */
+/** The button that opened the modal: the one just clicked, or the focused one (see currentOpener). */
 let opener: HTMLElement | null = null;
 
 // Shown ones only: focus() does nothing on a button hidden with v-show or visibility.
@@ -121,7 +167,7 @@ const opened = () => {
         window.addEventListener("keydown", onWindowKeydown, true);
     }
     openModals.push(onKeydown);
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    opener = currentOpener();
     // After the render: v-show shows the dialog and its buttons only then.
     void nextTick(showDialog);
 };

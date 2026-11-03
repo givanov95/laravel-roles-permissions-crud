@@ -87,9 +87,9 @@
   `RolesManager` and `PermissionsManager` now move it to the Delete of the row that took the deleted
   one's place (the row before, when the last row went), else to that row's Edit, else to the list's
   heading. And Safari and Firefox on macOS do not focus a button on a click, so a dialog opened with
-  the mouse had nothing to give the focus back to: the Delete buttons (the refused one too) now focus
-  themselves before they open it. An application opening `ConfirmationModal` from its own button does
-  the same (`button.focus()` in its click handler).
+  the mouse had nothing to give the focus back to: `ConfirmationModal` now takes the button or link
+  clicked just before it opened (within a second), else the focused element, so the focus also goes
+  back to an application's own button that opens it, with nothing to add in its handler.
 - **The delete confirmation stays locked while the delete runs.** `RolesManager` and `PermissionsManager`
   locked Delete on a form the request never used, so it stayed active: a second click sent a second
   request, and Escape, the overlay or Cancel closed the dialog mid-request (the request then closed a
