@@ -43,6 +43,18 @@ trait ChecksPermissionGrants
                 return;
             }
 
+            // With wildcards on, a name spatie cannot read makes every check fail for whoever has it. Only
+            // what the save adds: a role that already has one keeps it, to be renamed first.
+            $unreadable = EscalationGuard::unreadableWildcardNames($role, $requested);
+
+            if ($unreadable->isNotEmpty()) {
+                $validator->errors()->add('permissions', __('With wildcard permissions on, :permissions cannot be given: no part of the name may be empty or only spaces. Rename it first.', [
+                    'permissions' => $unreadable->implode(', '),
+                ]));
+
+                return;
+            }
+
             if (EscalationGuard::stripsProtectedRole($role, $requested)) {
                 $validator->errors()->add('permissions', __('The :role role is protected and cannot lose permissions.', [
                     'role' => $role?->name,

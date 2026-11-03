@@ -228,6 +228,29 @@ final class EscalationGuard
     }
 
     /**
+     * The names of the permissions a save would add to the role (all of `$requested` for a new role)
+     * that spatie's wildcard class cannot read ({@see readsAsWildcard()}). None with wildcards off.
+     *
+     * @param  Collection<int, int|string>  $requested
+     * @return Collection<int, string>
+     */
+    public static function unreadableWildcardNames(?RoleContract $role, Collection $requested): Collection
+    {
+        $added = $requested->diff($role === null ? collect() : Models::keys($role->permissions));
+
+        if (! self::wildcardsEnabled() || $added->isEmpty()) {
+            return collect();
+        }
+
+        return Models::permissions()
+            ->whereKey($added->all())
+            ->pluck('name')
+            ->reject(fn (string $name): bool => self::readsAsWildcard($name))
+            ->sort()
+            ->values();
+    }
+
+    /**
      * With wildcards on, a permission name spatie cannot read is refused ({@see readsAsWildcard()}):
      * once a role or a user had it, every `can()` for them would fail. `$current` is the name the
      * permission has now: kept as it is, it is not refused (a form saved without renaming).
