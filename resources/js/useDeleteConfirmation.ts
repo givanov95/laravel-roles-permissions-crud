@@ -53,7 +53,13 @@ export function useDeleteConfirmation(routeName: string) {
     let stoppedByUser = false;
     let stuckTimer: ReturnType<typeof setTimeout> | undefined;
 
-    onScopeDispose(() => clearTimeout(stuckTimer));
+    /** Set once the list is gone: an async delete may end after it, on another page. */
+    let disposed = false;
+
+    onScopeDispose(() => {
+        disposed = true;
+        clearTimeout(stuckTimer);
+    });
 
     const closeModal = () => {
         if (deleting.value) {
@@ -108,6 +114,7 @@ export function useDeleteConfirmation(routeName: string) {
                 stopDelete = null;
                 deleting.value = false;
                 closeModal();
+                if (disposed) return;
                 // Ended without a page: stopped from the modal, a lost connection, or a redirect Inertia
                 // drops for an async visit after a deploy (a new asset version). The server may still
                 // have deleted the record, so the list is read again: with a plain visit, which shows the
