@@ -29,34 +29,38 @@ let bodyOverflow = "";
 const onWindowKeydown = (event: KeyboardEvent) => openModals[openModals.length - 1]?.(event);
 
 /**
- * The button or link last pressed with a pointer, and when. Safari, and Firefox on macOS, do not focus
- * a button on a click, so a modal opened from one finds the focus on the body: it takes this one as
- * its opener instead, to give the focus back to on close. Only when pressed just before (a modal opened
- * later, by a timer or a response, has no button of its own). Listened to from the first mount on, in
- * the browser only.
+ * The button or link last clicked, and when. Safari, and Firefox on macOS, do not focus a button on a
+ * click, so a modal opened from one finds the focus on the body (or still on an element focused
+ * before): it takes the clicked one as its opener instead, to give the focus back to on close. Only
+ * when clicked just before (a modal opened later, by a timer or a response, has no button of its
+ * own). A click, not a press: a right click, a drag or a long press is not what opened it, and the
+ * click comes as late as possible. Listened to as soon as the module loads in the browser, before any
+ * modal is mounted (an application may mount one only when it opens).
  */
-let pressed: { element: HTMLElement; at: number } | null = null;
-let listening = false;
-const PRESSED_FOR_MS = 1000;
+let clicked: { element: HTMLElement; at: number } | null = null;
+const CLICKED_FOR_MS = 1000;
 
-const onPointerdown = (event: PointerEvent) => {
-    const element = event.target instanceof Element ? event.target.closest<HTMLElement>(FOCUSABLE) : null;
-    pressed = element ? { element, at: performance.now() } : null;
+const onDocumentClick = (event: MouseEvent) => {
+    // The element itself, also inside a web component's shadow root (the event's target is its host).
+    const origin = event.composedPath()[0];
+    const element = origin instanceof Element ? origin.closest<HTMLElement>(FOCUSABLE) : null;
+    clicked = element ? { element, at: performance.now() } : null;
 };
 
-const listenForPresses = () => {
-    if (listening) return;
-    listening = true;
-    // Capture: a handler that stops the event on its way down does not hide the press.
-    document.addEventListener("pointerdown", onPointerdown, true);
-};
+// Capture: a handler that stops the click on its way down does not hide it.
+if (typeof document !== "undefined") document.addEventListener("click", onDocumentClick, true);
 
-/** The element that opens a modal now: the focused one, else the button or link just pressed. */
+/**
+ * The element that opens a modal now: the one just clicked, else the focused one (a modal opened from
+ * the keyboard). Not one that is gone or inert (a button of a modal that has just closed).
+ */
 const currentOpener = (): HTMLElement | null => {
+    const usable = (element: Element | null): element is HTMLElement =>
+        element instanceof HTMLElement && element !== document.body && element.isConnected && !element.closest("[inert]");
+    const fresh = clicked && performance.now() - clicked.at < CLICKED_FOR_MS ? clicked.element : null;
+    if (usable(fresh)) return fresh;
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== document.body) return active;
-    if (pressed && performance.now() - pressed.at < PRESSED_FOR_MS && pressed.element.isConnected) return pressed.element;
-    return null;
+    return usable(active) ? active : null;
 };
 
 /** The panel's width for each `maxWidth`. Whole class names, so the app's Tailwind finds them. */
@@ -97,7 +101,7 @@ const contentId = ref<string>();
 const dialog = ref<HTMLDialogElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
 
-/** The button that opened the modal: the focused element, or the one just pressed (see currentOpener). */
+/** The button that opened the modal: the one just clicked, or the focused one (see currentOpener). */
 let opener: HTMLElement | null = null;
 
 // Shown ones only: focus() does nothing on a button hidden with v-show or visibility.
@@ -184,7 +188,6 @@ watch(
 
 // A modal mounted already open (and unmounted while open) opens and closes as well.
 onMounted(() => {
-    listenForPresses();
     const id = ++lastId;
     titleId.value = `rp-modal-${id}-title`;
     contentId.value = `rp-modal-${id}-content`;
