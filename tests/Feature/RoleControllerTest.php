@@ -72,4 +72,47 @@ class RoleControllerTest extends TestCase
         $response->assertInertiaFlash('toast.type', 'error');
         $this->assertModelExists($role);
     }
+
+    // ---------------------------------------------------------------- names spatie's wildcards cannot read
+
+    public function test_with_wildcards_a_permission_spatie_cannot_read_is_not_given_to_a_role(): void
+    {
+        config(['permission.enable_wildcard_permission' => true]);
+        // Stored before the check, or while wildcards were off.
+        $unreadable = Permission::create(['name' => 'a..b', 'guard_name' => 'web']);
+        $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
+        $message = 'With wildcard permissions on, a permission whose name has a part that is empty or only spaces cannot be given until it is renamed: a..b.';
+
+        $this->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$unreadable->id]])
+            ->assertSessionHasErrors(['permissions' => $message]);
+        $this->put(route('admin.roles.update', $role), ['name' => 'writer', 'permissions' => [$unreadable->id]])
+            ->assertSessionHasErrors(['permissions' => $message]);
+
+        $this->assertDatabaseMissing('roles', ['name' => 'editor']);
+        $this->assertCount(0, $role->fresh()->permissions);
+    }
+
+    public function test_with_wildcards_a_role_that_already_has_such_a_permission_may_be_saved(): void
+    {
+        $unreadable = Permission::create(['name' => 'a..b', 'guard_name' => 'web']);
+        $posts = Permission::create(['name' => 'posts.*', 'guard_name' => 'web']);
+        $role = Role::create(['name' => 'writer', 'guard_name' => 'web']);
+        $role->givePermissionTo($unreadable);
+        config(['permission.enable_wildcard_permission' => true]);
+
+        $this->put(route('admin.roles.update', $role), ['name' => 'writer', 'permissions' => [$unreadable->id, $posts->id]])
+            ->assertSessionHasNoErrors();
+
+        $this->assertEqualsCanonicalizing(['a..b', 'posts.*'], $role->fresh()->permissions->pluck('name')->all());
+    }
+
+    public function test_without_wildcards_a_name_with_an_empty_part_may_be_given(): void
+    {
+        $permission = Permission::create(['name' => 'a..b', 'guard_name' => 'web']);
+
+        $this->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$permission->id]])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue(Role::findByName('editor', 'web')->hasPermissionTo('a..b'));
+    }
 }

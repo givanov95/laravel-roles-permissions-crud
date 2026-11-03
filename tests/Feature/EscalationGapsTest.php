@@ -408,6 +408,17 @@ class EscalationGapsTest extends DefaultsTestCase
         $this->assertModelExists(Permission::findByName('*'));
     }
 
+    public function test_with_wildcards_an_unreadable_permission_the_user_does_not_hold_is_not_named(): void
+    {
+        // Escalation is checked first: the error must not tell a user who may not grant it what it is called.
+        config(['permission.enable_wildcard_permission' => true]);
+        $unreadable = Permission::findOrCreate('a..b', 'web');
+
+        $this->actingAs($this->userWith(['view-roles', 'manage-roles']))
+            ->post(route('admin.roles.store'), ['name' => 'editor', 'permissions' => [$unreadable->id]])
+            ->assertSessionHasErrors(['permissions' => 'The selected permission is invalid.']);
+    }
+
     public function test_without_wildcards_a_star_is_an_ordinary_name(): void
     {
         config(['roles-permissions-crud.allow_delete_in_use' => true]);

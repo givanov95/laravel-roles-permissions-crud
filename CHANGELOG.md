@@ -39,8 +39,11 @@
   Names already stored are left as they are, and saving one without renaming it is not refused; while
   wildcards are on, spatie fails for whoever has one before the screens are reached, so rename it with
   wildcards off. Without wildcards names are validated as before.
-  `EscalationGuard::readsAsWildcard()` and `wildcardNameRule()` give the same check to an
-  application's own forms.
+  The role form does not give a role such a permission either (one already stored), with another string
+  to translate: `With wildcard permissions on, a permission whose name has a part that is empty or only
+  spaces cannot be given until it is renamed: :permissions.` A role that already has one is saved as before.
+  `EscalationGuard::readsAsWildcard()`, `wildcardNameRule()` and `unreadableWildcardNames()` give the
+  same checks to an application's own forms.
 - **A delete that does not end normally no longer leaves the list guessing.** Since the delete modal
   locks while its request runs, a delete that got no answer (a lost connection, a lock in the database)
   kept the modal open until the page was reloaded. After 5 seconds without an answer, Cancel (and
