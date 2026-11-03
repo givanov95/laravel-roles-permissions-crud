@@ -35,8 +35,10 @@
   check for a user who has a name with an empty part or subpart (`reports.`, `a..b`, `a,,b`), so each
   `$user->can()` for them, the package's screens included, ended in a 500. Creating or renaming a
   permission to such a name is now refused with a validation error, which adds a string to translate:
-  `With wildcard permissions on, no part of the name may be empty (as in "posts." or "posts..edit").`
-  Names already stored are left as they are. Without wildcards names are validated as before.
+  `With wildcard permissions on, no part of the name may be empty or only spaces (as in "posts." or "posts..edit").`
+  Names already stored are left as they are, and saving one without renaming it is not refused; while
+  wildcards are on, spatie fails for whoever has one before the screens are reached, so rename it with
+  wildcards off. Without wildcards names are validated as before.
   `EscalationGuard::readsAsWildcard()` and `wildcardNameRule()` give the same check to an
   application's own forms.
 - **A delete that does not end normally no longer leaves the list guessing.** Since the delete modal

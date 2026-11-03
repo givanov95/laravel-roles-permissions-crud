@@ -224,30 +224,25 @@ final class EscalationGuard
             return true;
         }
 
-        try {
-            self::wildcardIndex($wildcards, collect([$name]), Models::guard());
-
-            return true;
-        } catch (WildcardPermissionNotProperlyFormatted) {
-            return false;
-        }
+        return self::readable($wildcards, $name, Models::guard());
     }
 
     /**
      * With wildcards on, a permission name spatie cannot read is refused ({@see readsAsWildcard()}):
-     * once a role or a user had it, every `can()` for them would fail.
+     * once a role or a user had it, every `can()` for them would fail. `$current` is the name the
+     * permission has now: kept as it is, it is not refused (a form saved without renaming).
      *
      * @return array<int, Closure(string, mixed, Closure(string): mixed): void>
      */
-    public static function wildcardNameRule(): array
+    public static function wildcardNameRule(?string $current = null): array
     {
         if (! self::wildcardsEnabled()) {
             return [];
         }
 
-        return [function (string $attribute, mixed $value, Closure $fail): void {
-            if (is_string($value) && ! self::readsAsWildcard($value)) {
-                $fail(__('With wildcard permissions on, no part of the name may be empty (as in "posts." or "posts..edit").'));
+        return [function (string $attribute, mixed $value, Closure $fail) use ($current): void {
+            if (is_string($value) && $value !== $current && ! self::readsAsWildcard($value)) {
+                $fail(__('With wildcard permissions on, no part of the name may be empty or only spaces (as in "posts." or "posts..edit").'));
             }
         }];
     }
@@ -298,19 +293,27 @@ final class EscalationGuard
         try {
             [$wildcard, $index] = self::wildcardIndex($class, $names, $guard);
         } catch (WildcardPermissionNotProperlyFormatted) {
-            $exact = $names->reject(function (string $name) use ($class, $guard): bool {
-                try {
-                    self::wildcardIndex($class, collect([$name]), $guard);
-
-                    return true;
-                } catch (WildcardPermissionNotProperlyFormatted) {
-                    return false;
-                }
-            })->values();
+            $exact = $names->reject(fn (string $name): bool => self::readable($class, $name, $guard))->values();
             [$wildcard, $index] = self::wildcardIndex($class, $names->diff($exact)->values(), $guard);
         }
 
         return fn (string $name): bool => $exact->contains($name) || $wildcard->implies($name, $guard, $index);
+    }
+
+    /**
+     * Whether the wildcard class can build its index from `$name` alone.
+     *
+     * @param  class-string<Wildcard>  $class
+     */
+    private static function readable(string $class, string $name, string $guard): bool
+    {
+        try {
+            self::wildcardIndex($class, collect([$name]), $guard);
+
+            return true;
+        } catch (WildcardPermissionNotProperlyFormatted) {
+            return false;
+        }
     }
 
     /**
