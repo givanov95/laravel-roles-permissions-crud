@@ -5,7 +5,7 @@ import { r } from "./config";
 import { focusAfterDelete, focusClicked } from "./focus";
 
 /** A row of a list that can be deleted. */
-export interface DeletableRow {
+interface DeletableRow {
     id: number | string;
     name: string;
 }
@@ -47,10 +47,10 @@ export function useDeleteConfirmation(routeName: string) {
     };
 
     const destroy = () => {
-        if (deleting.value) return;
+        if (deleting.value || deleteForm.id === null) return;
         // The modal keeps its own flag, set in `onStart`, which Inertia calls only for a visit that goes
         // ahead (not one a `before` listener stops).
-        router.delete(r(routeName, deleteForm.id as number | string) as string, {
+        router.delete(r(routeName, deleteForm.id) as string, {
             preserveScroll: true,
             onStart: () => {
                 deleting.value = true;

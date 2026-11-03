@@ -26,8 +26,8 @@
 ### Changed
 - **One delete confirmation for both lists.** `RolesManager` and `PermissionsManager` share the
   confirmation's state, the delete request and the focus afterwards (`useDeleteConfirmation()`), and
-  its modal (`DeleteConfirmationModal`), instead of a copy each. Both are internal, not exported, and
-  the lists behave as before.
+  its modal (`DeleteConfirmationModal`), instead of a copy each. Neither is exported from the package's
+  entry; they may change without notice. The lists behave as before.
 
 ### Fixed
 - **With wildcard permissions, a permission that covers a protected one is protected.** With

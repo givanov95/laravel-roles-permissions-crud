@@ -6,7 +6,8 @@ import SecondaryButton from "./SecondaryButton.vue";
 
 /**
  * The confirmation of a list's delete ({@see useDeleteConfirmation}). While `deleting`, its buttons
- * do nothing; the page decides whether `close` closes it.
+ * look disabled but still emit on a key press: the page ignores them then (the composable's
+ * `closeModal` and `destroy` do), and decides whether `close` closes the modal.
  */
 defineProps<{ show: boolean; title: string; name: string; deleting: boolean }>();
 
@@ -21,7 +22,8 @@ defineEmits<{ close: []; confirm: [] }>();
         </template>
         <template #footer>
             <!-- aria-disabled, not disabled: the focused button keeps the focus while the delete runs
-                 (a disabled one drops it to the body); closeModal and destroy ignore a key press.
+                 (a disabled one drops it to the body); useDeleteConfirmation's closeModal and destroy
+                 ignore a key press.
                  No pointer events, so the buttons do not light up on hover or press either. -->
             <SecondaryButton
                 :aria-disabled="deleting || undefined"
