@@ -212,6 +212,47 @@ final class EscalationGuard
     }
 
     /**
+     * Whether spatie's wildcard class can read a permission name: one with an empty part (`reports.`,
+     * `a..b`) or subpart (`a,,b`) makes it throw on every check for whoever has it. Always true with
+     * wildcards off, where a name is only a name.
+     */
+    public static function readsAsWildcard(string $name): bool
+    {
+        $wildcards = self::wildcardClass();
+
+        if ($wildcards === null) {
+            return true;
+        }
+
+        try {
+            self::wildcardIndex($wildcards, collect([$name]), Models::guard());
+
+            return true;
+        } catch (WildcardPermissionNotProperlyFormatted) {
+            return false;
+        }
+    }
+
+    /**
+     * With wildcards on, a permission name spatie cannot read is refused ({@see readsAsWildcard()}):
+     * once a role or a user had it, every `can()` for them would fail.
+     *
+     * @return array<int, Closure(string, mixed, Closure(string): mixed): void>
+     */
+    public static function wildcardNameRule(): array
+    {
+        if (! self::wildcardsEnabled()) {
+            return [];
+        }
+
+        return [function (string $attribute, mixed $value, Closure $fail): void {
+            if (is_string($value) && ! self::readsAsWildcard($value)) {
+                $fail(__('With wildcard permissions on, no part of the name may be empty (as in "posts." or "posts..edit").'));
+            }
+        }];
+    }
+
+    /**
      * The class spatie reads wildcard permissions with (`permission.wildcard_permission`), or null when
      * wildcards are off. Read from the config, as {@see wildcardsEnabled()} is, so the roles list and
      * the check agree on whether wildcards count. One that is not a spatie Wildcard fails as it does in
