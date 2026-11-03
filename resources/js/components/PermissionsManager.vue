@@ -41,7 +41,7 @@ const props = defineProps<{
 const table = useLaravelDataTable<Permission>(() => props.dataTable);
 const { canCreate } = useServerPage();
 
-const { showDeleteModal, deleteForm, deleting, heading, rows, confirmDelete, closeModal, destroy } =
+const { showDeleteModal, deleteForm, deleting, stuck, heading, rows, confirmDelete, closeModal, destroy } =
     useDeleteConfirmation("permissions.destroy");
 </script>
 
@@ -128,6 +128,7 @@ const { showDeleteModal, deleteForm, deleting, heading, rows, confirmDelete, clo
             :title="t('Delete permission')"
             :name="deleteForm.name"
             :deleting="deleting"
+            :stuck="stuck"
             @close="closeModal"
             @confirm="destroy"
         />

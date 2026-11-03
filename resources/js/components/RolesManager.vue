@@ -40,7 +40,7 @@ const props = defineProps<{
 const table = useLaravelDataTable<Role>(() => props.dataTable);
 const { canCreate } = useServerPage();
 
-const { showDeleteModal, deleteForm, deleting, heading, rows, confirmDelete, closeModal, destroy } =
+const { showDeleteModal, deleteForm, deleting, stuck, heading, rows, confirmDelete, closeModal, destroy } =
     useDeleteConfirmation("roles.destroy");
 </script>
 
@@ -140,6 +140,7 @@ const { showDeleteModal, deleteForm, deleting, heading, rows, confirmDelete, clo
             :title="t('Delete role')"
             :name="deleteForm.name"
             :deleting="deleting"
+            :stuck="stuck"
             @close="closeModal"
             @confirm="destroy"
         />
